@@ -1,11 +1,11 @@
 """
 Public API for lc_soliton.
 
-This module initially wraps the validated legacy engine with minimal refactoring.
+Stable public names should be imported from the thin wrapper modules here.
 """
 
 from .config import *
+from .runners import *
 from .io import *
-from .solvers import *
 from .diagnostics import *
 from .plotting import *
