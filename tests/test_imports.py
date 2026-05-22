@@ -1,6 +1,6 @@
 def test_import_lc_soliton():
     import lc_soliton
-    assert lc_soliton.__version__ == "0.0.1"
+    assert lc_soliton.__version__ == "0.0.2"
 
 
 def test_public_api_star_import():
