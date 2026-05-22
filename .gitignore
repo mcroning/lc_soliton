@@ -13,3 +13,6 @@ dist/
 .venv
 
 .DS_Store
+
+# Generated simulation outputs
+runs/
