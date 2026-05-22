@@ -59,3 +59,12 @@ Example:
 
 Legacy validated internals remain available during the transition, but new
 user-facing scripts should prefer the public API above.
+
+## Reference validation
+
+A stored strict-static reference case can be checked with:
+
+    lc-soliton --validate-reference
+
+This verifies trusted convergence and residual metrics for the first packaged
+physics regression case.

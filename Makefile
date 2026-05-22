@@ -1,4 +1,4 @@
-.PHONY: test gpu-test validate gui install-dev clean
+.PHONY: test gpu-test validate validate-reference gui install-dev clean
 
 install-dev:
 	python -m pip install -e ".[dev]"
@@ -12,6 +12,9 @@ gpu-test:
 validate:
 	python validation/validate_tiny_static.py
 	python validation/validate_strict_static_reference.py
+
+validate-reference:
+	lc-soliton --validate-reference
 
 gui:
 	streamlit run app/app.py
