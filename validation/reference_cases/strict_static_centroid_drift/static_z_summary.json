@@ -1,0 +1,13 @@
+{
+  "mode": "strict_static_z_march_bridge",
+  "Nz": 50,
+  "dz_um": 5.0,
+  "Nsub": 2,
+  "dz_sub_um": 2.5,
+  "phi_est": 0.9926043139304243,
+  "converged_count": 50,
+  "failed_count": 0,
+  "max_residual_max": 0.020740555872548416,
+  "max_residual_rms": 0.003490470181455505,
+  "P_final": 0.9999715089797974
+}
