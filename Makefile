@@ -11,6 +11,7 @@ gpu-test:
 
 validate:
 	python validation/validate_tiny_static.py
+	python validation/validate_strict_static_reference.py
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
