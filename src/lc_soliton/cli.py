@@ -8,6 +8,7 @@ import argparse
 
 from .config import RunConfig, derive_lc_constants, print_config_summary, validate_config
 
+from .version import __version__
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
@@ -23,6 +24,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     if args.summary:
+        print("lc_soliton version:", __version__)
         cfg = derive_lc_constants(RunConfig())
         validate_config(cfg)
         print_config_summary(cfg)

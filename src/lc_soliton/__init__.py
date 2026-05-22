@@ -1,3 +1,4 @@
+from .version import __version__, __version_name__
 """
 lc_soliton
 
