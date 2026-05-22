@@ -2,11 +2,15 @@
 Minimal LC Soliton GUI prototype.
 """
 
+import json
+from PIL import Image
+
 from pathlib import Path
 
 import streamlit as st
 
 from lc_soliton import LCParams, run_static
+
 
 
 st.set_page_config(
@@ -37,6 +41,45 @@ st.sidebar.header("Beam")
 
 waist_x_um = st.sidebar.number_input("waist x (µm)", value=8.0)
 waist_y_um = st.sidebar.number_input("waist y (µm)", value=8.0)
+
+
+st.header("Trusted reference case")
+
+case_dir = Path(
+    "validation/reference_cases/strict_static_centroid_drift"
+)
+
+if st.button("Show trusted strict-static reference case"):
+    st.subheader("Reference figures")
+
+    xz_png = case_dir / "xz_reference.png"
+    centroid_png = case_dir / "centroid_reference.png"
+
+    if xz_png.exists():
+        st.image(Image.open(xz_png), caption="xz intensity reference")
+
+    if centroid_png.exists():
+        st.image(Image.open(centroid_png), caption="x centroid drift reference")
+
+    metrics_path = case_dir / "trusted_metrics.json"
+    summary_path = case_dir / "static_z_summary.json"
+
+    if metrics_path.exists():
+        st.subheader("Trusted metrics")
+        st.json(json.loads(metrics_path.read_text()))
+
+    if summary_path.exists():
+        st.subheader("Static z summary")
+        st.json(json.loads(summary_path.read_text()))
+
+    reports_path = case_dir / "static_z_reports.json"
+    if reports_path.exists():
+        import pandas as pd
+
+        reports = json.loads(reports_path.read_text())
+        st.subheader("z-march reports")
+        st.dataframe(pd.DataFrame(reports))
+
 
 run_button = st.button("Run strict static case")
 
