@@ -80,6 +80,33 @@ if st.button("Show trusted strict-static reference case"):
         st.subheader("z-march reports")
         st.dataframe(pd.DataFrame(reports))
 
+st.subheader("Regenerate trusted reference case")
+
+if st.button("Run trusted reference simulation"):
+    import subprocess
+    import sys
+
+    script = (
+        Path("validation")
+        / "reference_cases"
+        / "strict_static_centroid_drift"
+        / "generate_case.py"
+    )
+
+    with st.spinner("Running trusted reference simulation..."):
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True,
+            text=True,
+        )
+
+    if proc.returncode == 0:
+        st.success("Trusted reference simulation completed")
+        st.code(proc.stdout)
+    else:
+        st.error("Trusted reference simulation failed")
+        st.code(proc.stdout)
+        st.code(proc.stderr)
 
 run_button = st.button("Run strict static case")
 
