@@ -1,4 +1,4 @@
-.PHONY: test gpu-test install-dev clean
+.PHONY: test gpu-test validate install-dev clean
 
 install-dev:
 	python -m pip install -e ".[dev]"
@@ -8,6 +8,9 @@ test:
 
 gpu-test:
 	pytest -q tests/test_gpu_available.py
+
+validate:
+	python validation/validate_tiny_static.py
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
