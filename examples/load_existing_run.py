@@ -4,9 +4,7 @@ Example: load an existing LC run directory.
 
 from pathlib import Path
 
-from lc_soliton.io import (
-    rebuild_ctx_from_run,
-)
+from lc_soliton import load_run
 
 RUN_DIR = Path("PATH_TO_RUN_DIRECTORY")
 
@@ -14,7 +12,7 @@ RUN_DIR = Path("PATH_TO_RUN_DIRECTORY")
 def main():
     print(f"Loading run from: {RUN_DIR}")
 
-    ctx, prdata = rebuild_ctx_from_run(RUN_DIR)
+    ctx, prdata = load_run(RUN_DIR)
 
     print("Run loaded successfully.")
     print(f"Nx = {ctx.Nx}")

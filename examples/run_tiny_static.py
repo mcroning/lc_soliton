@@ -8,7 +8,7 @@ scientific validation case.
 
 from pathlib import Path
 
-from lc_soliton import LCParams, run_lc_validated
+from lc_soliton import LCParams, run_static
 
 
 def main():
@@ -28,11 +28,9 @@ def main():
 
     run_dir = Path("runs/tiny_static_example")
 
-    result = run_lc_validated(
+    result = run_static(
         params,
         run_dir=run_dir,
-        mode="strict_static",
-        Nt=1,
         save_slices=True,
         save_full=False,
         progress=print,
