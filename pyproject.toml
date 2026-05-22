@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lc-soliton"
+version = "0.0.1"
+description = "Liquid-crystal optical soliton simulation tools"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Mark Cronin-Golomb" }
+]
+dependencies = [
+  "numpy",
+  "scipy",
+  "matplotlib",
+  "pandas",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+gpu = ["cupy-cuda12x"]
+gui = ["streamlit"]
+docs = ["mkdocs", "mkdocs-material"]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
