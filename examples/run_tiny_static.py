@@ -2,7 +2,8 @@
 Tiny end-to-end static LC run.
 
 This is intentionally small. It verifies that the canonical runner can create
-a run directory and write metadata/output files.
+a run directory and write metadata/output files. It is not intended as a
+scientific validation case.
 """
 
 from pathlib import Path
