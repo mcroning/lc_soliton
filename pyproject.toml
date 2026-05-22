@@ -19,6 +19,9 @@ dependencies = [
   "tqdm",
 ]
 
+[project.scripts]
+lc-soliton = "lc_soliton.cli:main"
+
 [project.optional-dependencies]
 gpu = ["cupy-cuda12x"]
 gui = ["streamlit"]
