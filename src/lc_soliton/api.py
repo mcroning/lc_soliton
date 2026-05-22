@@ -7,6 +7,7 @@ Stable public names should be imported from the thin wrapper modules here.
 from .config import *
 from .runners import *
 from .static import *
+from .timedependent import *
 from .io import *
 from .diagnostics import *
 from .plotting import *
