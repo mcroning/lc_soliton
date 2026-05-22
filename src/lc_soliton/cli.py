@@ -20,8 +20,21 @@ def main(argv=None) -> int:
         action="store_true",
         help="Print a default derived RunConfig summary.",
     )
+    parser.add_argument(
+    "--validate-reference",
+    action="store_true",
+    help="Validate the stored strict-static reference case.",
+    )
 
     args = parser.parse_args(argv)
+
+    if args.validate_reference:
+        from .validation import validate_strict_static_centroid_drift
+    
+        summary = validate_strict_static_centroid_drift()
+        print("strict static reference validation passed")
+        print("max_residual_rms:", summary["max_residual_rms"])
+        return 0
 
     if args.summary:
         print("lc_soliton version:", __version__)
