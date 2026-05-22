@@ -36,3 +36,26 @@ before deeper refactoring.
 ## Example
 
     python examples/config_smoke_test.py
+
+## Public API
+
+The current recommended public entry points are:
+
+    from lc_soliton import (
+        LCParams,
+        run_static,
+        run_td,
+        run_dg_td,
+        load_run,
+    )
+
+Example:
+
+    from pathlib import Path
+    from lc_soliton import LCParams, run_static
+
+    params = LCParams(Nx=64, Ny=64, Nz=8)
+    result = run_static(params, run_dir=Path("runs/example"))
+
+Legacy validated internals remain available during the transition, but new
+user-facing scripts should prefer the public API above.
