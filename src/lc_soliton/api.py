@@ -4,7 +4,7 @@ Public API for lc_soliton.
 This module initially wraps the validated legacy engine with minimal refactoring.
 """
 
-from .legacy_validated.lc_core.config import *
+from .config import *
 from .legacy_validated.lc_core.gpu_context import *
 from .legacy_validated.lc_core.io import *
 from .legacy_validated.lc_core.run_loader import *
