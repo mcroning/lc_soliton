@@ -67,6 +67,31 @@ if run_button:
             progress=None,
         )
 
-    st.success("Run complete")
+        st.success("Run complete")
+
+    st.subheader("Result")
+    st.json(result)
+
+    st.subheader("Generated files")
+
+    files = sorted(run_dir.glob("*"))
+    for f in files:
+        st.write(f.name)
+
+    metadata_path = run_dir / "metadata.json"
+    if metadata_path.exists():
+        st.subheader("Metadata")
+        st.json(metadata_path.read_text())
+
+    scalar_log = run_dir / "scalar_log.csv"
+    if scalar_log.exists():
+        import pandas as pd
+
+        st.subheader("Scalar log")
+        df = pd.read_csv(scalar_log)
+        st.dataframe(df)
+
+        if "z_um" in df.columns and "Imax" in df.columns:
+            st.line_chart(df.set_index("z_um")["Imax"])
 
     st.write(result)
