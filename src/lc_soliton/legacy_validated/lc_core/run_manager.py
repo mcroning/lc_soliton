@@ -6,7 +6,8 @@ import json
 import time
 import socket
 from pathlib import Path
-DEFAULT_RUN_ROOT = Path("/cluster/tufts/cglab/mcroning/lc_runs")
+import os
+DEFAULT_RUN_ROOT = Path(os.environ.get("LC_SOLITON_RUN_ROOT", "runs"))
 
 def make_run_dir(
     *,
