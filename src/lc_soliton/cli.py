@@ -15,6 +15,13 @@ def main(argv=None) -> int:
         prog="lc-soliton",
         description="Liquid-crystal optical soliton simulation tools.",
     )
+
+    parser.add_argument(
+        "--env",
+        action="store_true",
+        help="Print package and Python environment information.",
+    )
+
     parser.add_argument(
         "--summary",
         action="store_true",
@@ -34,6 +41,38 @@ def main(argv=None) -> int:
         summary = validate_strict_static_centroid_drift()
         print("strict static reference validation passed")
         print("max_residual_rms:", summary["max_residual_rms"])
+        return 0
+
+
+    if args.env:
+        import sys
+        from pathlib import Path
+        import lc_soliton
+
+        print("lc_soliton version:", __version__)
+        print("python:", sys.version.replace("\n", " "))
+        print("executable:", sys.executable)
+        print("package:", Path(lc_soliton.__file__).resolve())
+
+        try:
+            import numpy as np
+            print("numpy:", np.__version__)
+        except Exception as e:
+            print("numpy: unavailable", e)
+
+        try:
+            import scipy
+            print("scipy:", scipy.__version__)
+        except Exception as e:
+            print("scipy: unavailable", e)
+
+        try:
+            import cupy as cp
+            print("cupy:", cp.__version__)
+            print("cuda devices:", cp.cuda.runtime.getDeviceCount())
+        except Exception as e:
+            print("cupy: unavailable", e)
+
         return 0
 
     if args.summary:
