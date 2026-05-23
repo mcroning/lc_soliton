@@ -68,3 +68,13 @@ A stored strict-static reference case can be checked with:
 
 This verifies trusted convergence and residual metrics for the first packaged
 physics regression case.
+
+## Run output directory
+
+By default, generated outputs go under:
+
+    runs/
+
+You can override this with:
+
+    export LC_SOLITON_RUN_ROOT=/path/to/run/storage

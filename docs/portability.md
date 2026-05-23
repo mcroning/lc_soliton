@@ -26,3 +26,15 @@ The package should remain suitable for future Docker / Apptainer / Singularity d
 - Add environment export files.
 - Separate GUI viewer mode from compute mode.
 - Add public API for trusted reference-case execution.
+
+## Run output location
+
+By default, generated runs are written under:
+
+    runs/
+
+For cluster or container deployments, this can be overridden with:
+
+    export LC_SOLITON_RUN_ROOT=/path/to/run/storage
+
+This avoids hardcoded machine-specific paths.
