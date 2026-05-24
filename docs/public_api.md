@@ -70,3 +70,9 @@ The available engine modes can be queried programmatically:
     print(available_engine_modes())
 
 This is useful for GUIs, CLIs, and future job schedulers.
+
+## CLI engine modes
+
+Available execution modes can be listed from the command line:
+
+    lc-soliton --list-modes
