@@ -26,7 +26,7 @@ __all__ = [
     # requests
     "SimulationRequest",
     "GridRequest",
-    "GeometryRequest,
+    "GeometryRequest",
     "SolverRequest",
     "MaterialRequest",
     "OutputRequest",
