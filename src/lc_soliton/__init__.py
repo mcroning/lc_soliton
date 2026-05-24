@@ -25,6 +25,7 @@ __all__ = [
 
     # requests
     "SimulationRequest",
+    "LaunchRequest",
     "GridRequest",
     "GeometryRequest",
     "SolverRequest",
@@ -96,6 +97,8 @@ def __getattr__(name):
 
     if name in {
         "SimulationRequest",
+        "LaunchRequest",
+    "LaunchRequest",
         "GridRequest",
         "GeometryRequest",
         "MaterialRequest",
