@@ -47,3 +47,18 @@ The following top-level imports are considered stable:
     from lc_soliton import load_run
 
 Tests protect these names so future refactors do not accidentally remove them.
+
+## Engine dispatcher
+
+A canonical dispatcher is available for higher-level tools:
+
+    from lc_soliton import run_engine
+
+Supported modes currently include:
+
+    strict_static
+    td_predictor_only
+    dg_td_predictor
+
+This is intended for CLI, GUI, notebooks, and future job schedulers that need a
+single execution entry point.
