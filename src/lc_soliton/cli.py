@@ -43,6 +43,13 @@ def main(argv=None) -> int:
     )
 
     parser.add_argument(
+        "--summarize-reference",
+        metavar="NAME",
+        default=None,
+        help="Print compact summary for a reference case.",
+    )
+
+    parser.add_argument(
         "--show-reference",
         metavar="NAME",
         default=None,
@@ -81,6 +88,18 @@ def main(argv=None) -> int:
 
         if isinstance(summary, dict) and "max_residual_rms" in summary:
             print("max_residual_rms:", summary["max_residual_rms"])
+
+        return 0
+
+    if args.summarize_reference:
+        from .reference_cases import summarize_reference_case
+
+        summary = summarize_reference_case(args.summarize_reference)
+
+        print("reference summary:", summary["name"])
+        for key, value in summary.items():
+            if key != "name":
+                print(f"  {key}: {value}")
 
         return 0
 
