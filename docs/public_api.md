@@ -76,3 +76,19 @@ This is useful for GUIs, CLIs, and future job schedulers.
 Available execution modes can be listed from the command line:
 
     lc-soliton --list-modes
+
+## Reference-case CLI commands
+
+Reference cases can be inspected or validated from the command line.
+
+Show stored metadata:
+
+    lc-soliton --show-reference strict_static_centroid_drift
+
+Run/validate through the public reference-case dispatcher:
+
+    lc-soliton --run-reference strict_static_centroid_drift
+
+Legacy convenience validation command:
+
+    lc-soliton --validate-reference
