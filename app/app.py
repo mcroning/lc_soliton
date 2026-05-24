@@ -9,7 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from lc_soliton import LCParams, run_static
+from lc_soliton import LCParams, run_static, load_reference_case
 
 
 
@@ -50,10 +50,14 @@ case_dir = Path(
 )
 
 if st.button("Show trusted strict-static reference case"):
+    data = load_reference_case("strict_static_centroid_drift")
+
     st.subheader("Reference figures")
 
-    xz_png = case_dir / "xz_reference.png"
-    centroid_png = case_dir / "centroid_reference.png"
+    figures = data.get("figures", {})
+
+    xz_png = Path(figures["xz_reference"])
+    centroid_png = Path(figures["centroid_reference"])
 
     if xz_png.exists():
         st.image(Image.open(xz_png), caption="xz intensity reference")
@@ -61,18 +65,18 @@ if st.button("Show trusted strict-static reference case"):
     if centroid_png.exists():
         st.image(Image.open(centroid_png), caption="x centroid drift reference")
 
-    metrics_path = case_dir / "trusted_metrics.json"
-    summary_path = case_dir / "static_z_summary.json"
-
-    if metrics_path.exists():
+    if "trusted_metrics" in data:
         st.subheader("Trusted metrics")
-        st.json(json.loads(metrics_path.read_text()))
+        st.json(data["trusted_metrics"])
 
-    if summary_path.exists():
+    if "summary" in data:
         st.subheader("Static z summary")
-        st.json(json.loads(summary_path.read_text()))
+        st.json(data["summary"])
 
-    reports_path = case_dir / "static_z_reports.json"
+    reports_path = (
+        Path(data["case_dir"]) / "static_z_reports.json"
+    )
+
     if reports_path.exists():
         import pandas as pd
 
