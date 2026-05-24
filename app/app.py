@@ -15,6 +15,7 @@ from lc_soliton import (
     load_reference_case,
     available_engine_modes,
     run_reference_case,
+    available_reference_cases,
 )
 
 
@@ -54,14 +55,24 @@ waist_x_um = st.sidebar.number_input("waist x (µm)", value=8.0)
 waist_y_um = st.sidebar.number_input("waist y (µm)", value=8.0)
 
 
+
 st.header("Trusted reference case")
+
+reference_names = available_reference_cases()
+selected_reference = st.selectbox(
+    "Reference case",
+    reference_names,
+    index=reference_names.index("strict_static_centroid_drift")
+    if "strict_static_centroid_drift" in reference_names
+    else 0,
+)
 
 case_dir = Path(
     "validation/reference_cases/strict_static_centroid_drift"
 )
 
 if st.button("Show trusted strict-static reference case"):
-    data = load_reference_case("strict_static_centroid_drift")
+    data = load_reference_case(selected_reference)
 
     st.subheader("Reference figures")
 
@@ -97,31 +108,16 @@ if st.button("Show trusted strict-static reference case"):
 
 st.subheader("Regenerate trusted reference case")
 
-if st.button("Run trusted reference simulation"):
-    import subprocess
-    import sys
-
-    script = (
-        Path("validation")
-        / "reference_cases"
-        / "strict_static_centroid_drift"
-        / "generate_case.py"
-    )
-
-    with st.spinner("Running trusted reference simulation..."):
-        proc = subprocess.run(
-            [sys.executable, str(script)],
-            capture_output=True,
-            text=True,
-        )
-
-    if proc.returncode == 0:
-        st.success("Trusted reference simulation completed")
-        st.code(proc.stdout)
-    else:
-        st.error("Trusted reference simulation failed")
-        st.code(proc.stdout)
-        st.code(proc.stderr)
+if st.button("Validate trusted reference case"):
+    with st.spinner("Running trusted reference validation..."):
+        try:
+            summary = run_reference_case(selected_reference)
+        except Exception as exc:
+            st.error("Trusted reference validation failed")
+            st.exception(exc)
+        else:
+            st.success("Trusted reference validation passed")
+            st.json(summary)
 
 run_button = st.button("Run strict static case")
 
