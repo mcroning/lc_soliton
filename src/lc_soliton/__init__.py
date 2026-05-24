@@ -17,6 +17,7 @@ __all__ = [
     "run_td",
     "run_dg_td",
     "load_run",
+    "load_reference_case",
 ]
 
 
@@ -44,5 +45,9 @@ def __getattr__(name):
     if name == "load_run":
         from .runs import load_run
         return load_run
+
+    if name == "load_reference_case":
+        from .reference_cases import load_reference_case
+        return load_reference_case
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
