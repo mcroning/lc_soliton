@@ -28,12 +28,46 @@ def main(argv=None) -> int:
         help="Print a default derived RunConfig summary.",
     )
     parser.add_argument(
+        "--show-reference",
+        metavar="NAME",
+        default=None,
+        help="Show stored reference-case metadata.",
+    )
+
+    parser.add_argument(
     "--validate-reference",
     action="store_true",
     help="Validate the stored strict-static reference case.",
     )
 
     args = parser.parse_args(argv)
+
+
+    if args.show_reference:
+        from .reference_cases import load_reference_case
+
+        data = load_reference_case(args.show_reference)
+
+        print("reference case:", data["name"])
+        print("case_dir:", data["case_dir"])
+
+        if "trusted_metrics" in data:
+            print("\ntrusted metrics:")
+            for k, v in data["trusted_metrics"].items():
+                if k != "notes":
+                    print(f"  {k}: {v}")
+
+        if "summary" in data:
+            print("\nsummary:")
+            for k, v in data["summary"].items():
+                print(f"  {k}: {v}")
+
+        if "figures" in data:
+            print("\nfigures:")
+            for k, v in data["figures"].items():
+                print(f"  {k}: {v}")
+
+        return 0
 
     if args.validate_reference:
         from .validation import validate_strict_static_centroid_drift
