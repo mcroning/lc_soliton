@@ -30,6 +30,13 @@ def main(argv=None) -> int:
         help="Print a default derived RunConfig summary.",
     )
     parser.add_argument(
+        "--run-reference",
+        metavar="NAME",
+        default=None,
+        help="Run/validate a public reference case.",
+    )
+
+    parser.add_argument(
         "--show-reference",
         metavar="NAME",
         default=None,
@@ -50,6 +57,17 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
 
+
+    if args.run_reference:
+        from .reference_runner import run_reference_case
+
+        summary = run_reference_case(args.run_reference)
+        print("reference case passed:", args.run_reference)
+
+        if isinstance(summary, dict) and "max_residual_rms" in summary:
+            print("max_residual_rms:", summary["max_residual_rms"])
+
+        return 0
 
     if args.show_reference:
         from .reference_cases import load_reference_case
