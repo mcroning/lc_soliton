@@ -39,6 +39,10 @@ def run_engine(mode_or_request, *args, **kwargs):
     """
     if isinstance(mode_or_request, SimulationRequest):
         request = mode_or_request
+
+        from .request_validation import validate_request
+        validate_request(request)
+
         mode = request.mode
 
         param_data = {
