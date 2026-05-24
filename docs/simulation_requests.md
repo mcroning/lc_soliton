@@ -100,3 +100,12 @@ Future request sections may include:
 - material
 - optical launch
 - boundary conditions
+
+### GeometryRequest
+
+    xaper_um
+    yaper_um
+    dz_um
+
+`GeometryRequest` is now consumed by the engine request path and mapped into
+the legacy execution parameters while the migration is ongoing.
