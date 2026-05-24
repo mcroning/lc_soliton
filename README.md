@@ -33,6 +33,12 @@ before deeper refactoring.
 
     lc-soliton --summary
 
+## Reference validation
+
+Check that the installed package reproduces the trusted strict-static benchmark:
+
+    lc-soliton --validate-reference
+
 ## Example
 
     python examples/config_smoke_test.py
