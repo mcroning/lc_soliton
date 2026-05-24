@@ -53,6 +53,9 @@ def run_engine(mode_or_request, *args, **kwargs):
             "yaper_um": request.geometry.yaper_um,
             "dz_um": request.geometry.dz_um,
             "static_max_steps": request.solver.static_max_steps,
+            "ne": request.material.ne,
+            "no": request.material.no,
+
         }
         param_data.update(request.params)
         
