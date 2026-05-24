@@ -9,7 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from lc_soliton import LCParams, run_static, load_reference_case
+from lc_soliton import LCParams, run_static, load_reference_case, available_engine_modes
 
 
 
@@ -19,6 +19,11 @@ st.set_page_config(
 )
 
 st.title("LC Soliton Simulator")
+
+st.caption(
+    "Available engine modes: "
+    + ", ".join(available_engine_modes())
+)
 
 st.sidebar.header("Grid")
 
