@@ -53,5 +53,31 @@ def load_reference_case(name: str, repo_root: str | Path | None = None) -> dict:
 
 __all__ = [
     "get_reference_case_dir",
-    "load_reference_case",
+    "load_reference_case,
+    "summarize_reference_case",
 ]
+
+
+def summarize_reference_case(name: str, repo_root: str | Path | None = None) -> dict:
+    """
+    Return a compact summary of a stored reference case.
+    """
+    data = load_reference_case(name, repo_root=repo_root)
+
+    summary = {
+        "name": data["name"],
+        "case_dir": data["case_dir"],
+        "has_trusted_metrics": "trusted_metrics" in data,
+        "has_summary": "summary" in data,
+        "has_reports": "reports" in data,
+        "has_config": "config" in data,
+        "figures": data.get("figures", {}),
+    }
+
+    if "trusted_metrics" in data:
+        tm = data["trusted_metrics"]
+        for key in ["max_residual_rms", "max_residual_max", "P_final"]:
+            if key in tm:
+                summary[key] = tm[key]
+
+    return summary
