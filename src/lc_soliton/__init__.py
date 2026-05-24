@@ -34,6 +34,7 @@ __all__ = [
     "RuntimeRequest",
     "save_request",
     "load_request",
+    "simulation_request_schema",
 
     # run loading
     "load_run",
@@ -43,6 +44,7 @@ __all__ = [
     "summarize_reference_case",
     "run_reference_case",
     "available_reference_cases",
+
 ]
 
 
