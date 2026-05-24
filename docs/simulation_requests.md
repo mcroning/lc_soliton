@@ -146,3 +146,18 @@ parameter bridge remains available:
 
     MaterialRequest
     LaunchRequest
+
+## Schema introspection
+
+The current high-level request schema can be inspected with:
+
+    lc-soliton --request-schema
+
+or from Python:
+
+    from lc_soliton import simulation_request_schema
+
+    schema = simulation_request_schema()
+
+This is useful for GUIs, job launchers, documentation generation, and future
+container or remote execution frontends.
