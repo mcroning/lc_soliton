@@ -41,7 +41,14 @@ def run_engine(mode_or_request, *args, **kwargs):
         request = mode_or_request
         mode = request.mode
 
-        params = LCParams(**request.params)
+        param_data = {
+            "Nx": request.grid.Nx,
+            "Ny": request.grid.Ny,
+            "Nz": request.grid.Nz,
+        }
+        param_data.update(request.params)
+        
+        params = LCParams(**param_data)
         from .request import save_request
 
         common_kwargs = dict(

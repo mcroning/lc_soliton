@@ -9,25 +9,36 @@ from .version import __version__, __version_name__
 __all__ = [
     "__version__",
     "__version_name__",
+
+    # configuration
     "RunConfig",
     "LCParams",
+
+    # backend / execution
     "get_backend",
     "run_lc_validated",
     "run_static",
     "run_td",
     "run_dg_td",
-    "load_run",
-    "load_reference_case",
     "run_engine",
     "available_engine_modes",
+
+    # requests
+    "SimulationRequest",
+    "GridRequest",
+    "OutputRequest",
+    "RuntimeRequest",
+    "save_request",
+    "load_request",
+
+    # run loading
+    "load_run",
+
+    # reference cases
+    "load_reference_case",
+    "summarize_reference_case",
     "run_reference_case",
     "available_reference_cases",
-    "load_request",
-    "save_request",
-    "RuntimeRequest",
-    "OutputRequest",
-    "SimulationRequest",
-    "summarize_reference_case",
 ]
 
 
@@ -82,6 +93,7 @@ def __getattr__(name):
 
     if name in {
         "SimulationRequest",
+        "GridRequest",
         "OutputRequest",
         "RuntimeRequest",
         "save_request",

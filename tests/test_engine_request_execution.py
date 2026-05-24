@@ -5,6 +5,7 @@ import shutil
 def test_run_engine_executes_static_request():
     from lc_soliton import (
         SimulationRequest,
+        GridRequest,
         OutputRequest,
         RuntimeRequest,
         run_engine,
@@ -17,12 +18,8 @@ def test_run_engine_executes_static_request():
 
     req = SimulationRequest(
         mode="strict_static",
-        params={
-            "Nx": 32,
-            "Ny": 32,
-            "Nz": 2,
-            "static_max_steps": 2,
-        },
+        grid=GridRequest(Nx=32, Ny=32, Nz=2),
+        params={"static_max_steps": 2},
         output=OutputRequest(
             run_dir=str(run_dir),
             save_slices=False,
