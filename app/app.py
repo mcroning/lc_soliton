@@ -67,10 +67,6 @@ selected_reference = st.selectbox(
     else 0,
 )
 
-case_dir = Path(
-    "validation/reference_cases/strict_static_centroid_drift"
-)
-
 if st.button("Show trusted strict-static reference case"):
     data = load_reference_case(selected_reference)
 
