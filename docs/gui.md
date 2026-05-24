@@ -33,3 +33,20 @@ The validation button calls:
     run_reference_case("strict_static_centroid_drift")
 
 rather than directly invoking legacy scripts.
+
+## Dynamic reference-case selection
+
+The GUI now queries available reference cases dynamically using:
+
+    available_reference_cases()
+
+Reference display uses:
+
+    load_reference_case(name)
+
+Reference validation uses:
+
+    run_reference_case(name)
+
+The GUI no longer directly invokes validation scripts or hardcoded
+reference-case filesystem paths.
