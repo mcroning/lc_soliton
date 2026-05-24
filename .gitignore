@@ -1,18 +1,24 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 
-*.egg-info/
-build/
-dist/
-
+# Jupyter
 .ipynb_checkpoints/
 
-.env
-.venv
+# pytest
+.pytest_cache/
 
-.DS_Store
+# build artifacts
+build/
+dist/
+*.egg-info/
 
-# Generated simulation outputs
+# local environments
+.venv/
+env/
+
+# local outputs
 runs/
+
+# macOS
+.DS_Store
