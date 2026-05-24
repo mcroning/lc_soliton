@@ -64,3 +64,39 @@ A request-driven run therefore contains:
     environment.json
 
 This makes the run reproducible from the original execution request.
+
+## Structured request sections
+
+Simulation requests are gradually moving away from one flat parameter dictionary
+toward structured sections.
+
+Current structure:
+
+    SimulationRequest
+        grid: GridRequest
+        solver: SolverRequest
+        output: OutputRequest
+        runtime: RuntimeRequest
+        params: dict
+
+`params` remains as a legacy bridge for options that have not yet been promoted
+to structured request fields.
+
+### GridRequest
+
+    Nx
+    Ny
+    Nz
+
+### SolverRequest
+
+    static_max_steps
+    Nt
+    dt
+    t_stride
+
+Future request sections may include:
+- geometry
+- material
+- optical launch
+- boundary conditions
