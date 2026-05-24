@@ -42,3 +42,25 @@ Simulation requests provide a portable execution format for:
 - Slurm jobs
 - future container execution
 - reference-case regeneration
+
+## Request provenance
+
+When a simulation is executed through:
+
+    run_engine(SimulationRequest(...))
+
+or:
+
+    lc-soliton --run-request request.json
+
+the request is saved into the output directory as:
+
+    request.json
+
+A request-driven run therefore contains:
+
+    request.json
+    metadata.json
+    environment.json
+
+This makes the run reproducible from the original execution request.
