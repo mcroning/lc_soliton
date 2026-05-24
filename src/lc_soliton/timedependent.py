@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .legacy_validated.lc_engine_validated import LCParams, run_lc_validated
+from .environment import write_environment_json
 
 
 def run_td(
@@ -26,7 +27,7 @@ def run_td(
 
     This uses the validated predictor-only TD branch.
     """
-    return run_lc_validated(
+    result = run_lc_validated(
         params,
         run_dir=run_dir,
         mode="td_predictor_only",
@@ -37,6 +38,10 @@ def run_td(
         save_full=save_full,
         progress=progress,
     )
+
+    write_environment_json(run_dir)
+
+    return result
 
 
 __all__ = [

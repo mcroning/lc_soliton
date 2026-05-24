@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .legacy_validated.lc_engine_validated import LCParams, run_lc_validated
+from .environment import write_environment_json
 
 
 def run_static(
@@ -43,7 +44,7 @@ def run_static(
     dict
         Run metadata and lightweight result information.
     """
-    return run_lc_validated(
+    result = run_lc_validated(
         params,
         run_dir=run_dir,
         mode="strict_static",
@@ -52,6 +53,10 @@ def run_static(
         save_full=save_full,
         progress=progress,
     )
+
+    write_environment_json(run_dir)
+
+    return result
 
 
 __all__ = [
