@@ -111,3 +111,19 @@ The returned dictionary may include:
 
 GUIs and notebooks should use this API instead of hardcoding reference-case
 filenames or directory layouts.
+
+## Protected public surface
+
+The following names are protected by regression tests:
+
+    run_static
+    run_td
+    run_dg_td
+    run_engine
+    available_engine_modes
+    load_reference_case
+    summarize_reference_case
+    run_reference_case
+    available_reference_cases
+
+If these names change, tests should fail and documentation should be updated.
