@@ -94,14 +94,18 @@ def main(argv=None) -> int:
     if args.run_request:
         from .request import load_request
         from .engine import run_engine
-
-        request = load_request(args.run_request)
-        result = run_engine(request)
-
+    
+        try:
+            request = load_request(args.run_request)
+            result = run_engine(request)
+        except Exception as exc:
+            print(f"request failed: {exc}", file=__import__("sys").stderr)
+            return 1
+    
         print("request completed:", args.run_request)
         if isinstance(result, dict):
             print("result keys:", sorted(result.keys()))
-
+    
         return 0
 
     if args.list_references:

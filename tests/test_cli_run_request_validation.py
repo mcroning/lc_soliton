@@ -33,4 +33,6 @@ def test_cli_run_request_rejects_invalid_request(tmp_path):
     )
 
     assert result.returncode != 0
+    assert "request failed:" in result.stderr
     assert "Nx must be positive" in result.stderr
+    
