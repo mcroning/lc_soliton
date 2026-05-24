@@ -7,3 +7,5 @@ def test_load_reference_case():
     assert "trusted_metrics" in data
     assert "summary" in data
     assert "figures" in data
+    assert "reports" in data
+    assert isinstance(data["reports"], list)
