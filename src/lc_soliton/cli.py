@@ -36,17 +36,17 @@ def main(argv=None) -> int:
     )
 
     parser.add_argument(
-        "--run-reference",
-        metavar="NAME",
-        default=None,
-        help="Run/validate a public reference case.",
-    )
-
-    parser.add_argument(
         "--summarize-reference",
         metavar="NAME",
         default=None,
         help="Print compact summary for a reference case.",
+    )
+
+    parser.add_argument(
+        "--run-reference",
+        metavar="NAME",
+        default=None,
+        help="Run/validate a public reference case.",
     )
 
     parser.add_argument(
@@ -80,17 +80,6 @@ def main(argv=None) -> int:
 
         return 0
 
-    if args.run_reference:
-        from .reference_runner import run_reference_case
-
-        summary = run_reference_case(args.run_reference)
-        print("reference case passed:", args.run_reference)
-
-        if isinstance(summary, dict) and "max_residual_rms" in summary:
-            print("max_residual_rms:", summary["max_residual_rms"])
-
-        return 0
-
     if args.summarize_reference:
         from .reference_cases import summarize_reference_case
 
@@ -103,9 +92,32 @@ def main(argv=None) -> int:
 
         return 0
 
-    if args.show_reference:
-        from .reference_cases import load_reference_case
+    if args.run_reference:
+        from .reference_runner import run_reference_case
 
+        summary = run_reference_case(args.run_reference)
+        print("reference case passed:", args.run_reference)
+
+        if isinstance(summary, dict) and "max_residual_rms" in summary:
+            print("max_residual_rms:", summary["max_residual_rms"])
+
+        return 0
+
+    if args.show_reference:
+        from .reference_cases import (
+            load_reference_case,
+            summarize_reference_case,
+        )
+    
+        compact = summarize_reference_case(args.show_reference)
+    
+        print("compact summary:")
+        for k, v in compact.items():
+            if k not in {"figures", "case_dir"}:
+                print(f"  {k}: {v}")
+    
+        print()
+    
         data = load_reference_case(args.show_reference)
 
         print("reference case:", data["name"])
