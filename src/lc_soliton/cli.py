@@ -30,6 +30,12 @@ def main(argv=None) -> int:
         help="Print a default derived RunConfig summary.",
     )
     parser.add_argument(
+        "--list-references",
+        action="store_true",
+        help="List available reference cases.",
+    )
+
+    parser.add_argument(
         "--run-reference",
         metavar="NAME",
         default=None,
@@ -57,6 +63,15 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
 
+
+    if args.list_references:
+        from .reference_runner import available_reference_cases
+
+        print("available reference cases:")
+        for name in available_reference_cases():
+            print(f"  {name}")
+
+        return 0
 
     if args.run_reference:
         from .reference_runner import run_reference_case
@@ -96,9 +111,9 @@ def main(argv=None) -> int:
         return 0
 
     if args.validate_reference:
-        from .validation import validate_strict_static_centroid_drift
-    
-        summary = validate_strict_static_centroid_drift()
+        from .reference_runner import run_reference_case
+
+        summary = run_reference_case("strict_static_centroid_drift")
         print("strict static reference validation passed")
         print("max_residual_rms:", summary["max_residual_rms"])
         return 0
