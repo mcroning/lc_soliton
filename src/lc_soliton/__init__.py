@@ -19,6 +19,7 @@ __all__ = [
     "load_run",
     "load_reference_case",
     "run_engine",
+    "available_engine_modes",
 ]
 
 
@@ -54,5 +55,9 @@ def __getattr__(name):
     if name == "run_engine":
         from .engine import run_engine
         return run_engine
+
+    if name == "available_engine_modes":
+        from .engine import available_engine_modes
+        return available_engine_modes
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

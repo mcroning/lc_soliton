@@ -23,6 +23,12 @@ ENGINE_MODES = {
 
 }
 
+def available_engine_modes():
+    """
+    Return sorted list of supported engine modes.
+    """
+    return sorted(ENGINE_MODES)
+
 def run_engine(mode: str, *args, **kwargs):
 
     """
