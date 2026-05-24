@@ -97,3 +97,36 @@ The following user-facing paths should use this shared API:
       reference CLI consistency tests
 
 This reduces duplicated validation logic and keeps CLI/GUI behavior aligned.
+
+## Structured request milestone
+
+The package now includes a canonical request layer:
+
+    SimulationRequest
+
+with structured sections:
+
+    GridRequest
+    GeometryRequest
+    MaterialRequest
+    LaunchRequest
+    SolverRequest
+    OutputRequest
+    RuntimeRequest
+
+Request-driven execution is available through:
+
+    run_engine(SimulationRequest(...))
+    lc-soliton --run-request request.json
+
+Request-driven runs persist:
+
+    request.json
+    metadata.json
+    environment.json
+
+Requests are validated before execution. Current validation checks include
+positive grid sizes, positive dz, and positive launch power.
+
+The legacy flat params dictionary remains available as a bridge while structured
+request sections are gradually wired into execution.
