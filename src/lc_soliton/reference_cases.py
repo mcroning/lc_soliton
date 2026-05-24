@@ -36,6 +36,7 @@ def load_reference_case(name: str, repo_root: str | Path | None = None) -> dict:
     for filename, key in [
         ("trusted_metrics.json", "trusted_metrics"),
         ("static_z_summary.json", "summary"),
+        ("static_z_reports.json", "reports"),
         ("config.json", "config"),
     ]:
         path = case_dir / filename

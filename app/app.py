@@ -67,6 +67,10 @@ selected_reference = st.selectbox(
     else 0,
 )
 
+case_dir = Path(
+    "validation/reference_cases/strict_static_centroid_drift"
+)
+
 if st.button("Show trusted strict-static reference case"):
     data = load_reference_case(selected_reference)
 
@@ -95,12 +99,11 @@ if st.button("Show trusted strict-static reference case"):
         Path(data["case_dir"]) / "static_z_reports.json"
     )
 
-    if reports_path.exists():
+    if "reports" in data:
         import pandas as pd
-
-        reports = json.loads(reports_path.read_text())
+    
         st.subheader("z-march reports")
-        st.dataframe(pd.DataFrame(reports))
+        st.dataframe(pd.DataFrame(data["reports"]))
 
 st.subheader("Regenerate trusted reference case")
 
