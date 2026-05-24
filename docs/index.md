@@ -6,6 +6,7 @@
 - [Current project status](current_status.md)
 - [Project map](project_map.md)
 - [Public API](public_api.md)
+- [Simulation requests](simulation_requests.md)
 
 ## Development
 
