@@ -22,3 +22,14 @@ It should not call legacy bridge functions directly.
 On managed clusters, Streamlit access may require VPN, SSH tunneling, or an
 institution-provided reverse proxy. The app itself should be launched from the
 repository root.
+
+## Reference-case validation
+
+The GUI can display the stored strict-static reference case and validate it
+through the public package API.
+
+The validation button calls:
+
+    run_reference_case("strict_static_centroid_drift")
+
+rather than directly invoking legacy scripts.
