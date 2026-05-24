@@ -109,3 +109,40 @@ Future request sections may include:
 
 `GeometryRequest` is now consumed by the engine request path and mapped into
 the legacy execution parameters while the migration is ongoing.
+
+### MaterialRequest
+
+    ne
+    no
+    K
+    De
+
+`MaterialRequest` describes optical and elastic material constants. It is part
+of the structured request schema but is not yet fully consumed by all execution
+paths.
+
+### LaunchRequest
+
+    power_mW
+    waist_um
+    separation_um
+
+`LaunchRequest` describes the optical launch/excitation configuration. It is
+part of the structured request schema but is not yet fully consumed by all
+execution paths.
+
+## Migration status
+
+Some request sections are already consumed by the engine:
+
+    GridRequest
+    GeometryRequest
+    SolverRequest
+    OutputRequest
+    RuntimeRequest
+
+Other sections currently serve as structured semantic metadata while the legacy
+parameter bridge remains available:
+
+    MaterialRequest
+    LaunchRequest
