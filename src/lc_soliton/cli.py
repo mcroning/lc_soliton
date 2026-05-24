@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import argparse
 
+from .engine import available_engine_modes
+
 from .config import RunConfig, derive_lc_constants, print_config_summary, validate_config
 
 from .version import __version__
@@ -38,6 +40,12 @@ def main(argv=None) -> int:
     "--validate-reference",
     action="store_true",
     help="Validate the stored strict-static reference case.",
+    )
+
+    parser.add_argument(
+    "--list-modes",
+    action="store_true",
+    help="List available engine modes.",
     )
 
     args = parser.parse_args(argv)
@@ -116,6 +124,12 @@ def main(argv=None) -> int:
         print_config_summary(cfg)
         return 0
 
+    if args.list_modes:
+        print("available engine modes:")
+        for mode in available_engine_modes():
+            print(f"  {mode}")
+        return 0
+    
     parser.print_help()
     return 0
 
