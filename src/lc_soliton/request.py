@@ -31,7 +31,12 @@ class RuntimeRequest:
     backend: str = "auto"
     progress: bool = True
 
-
+@dataclass
+class GridRequest:
+    Nx: int = 512
+    Ny: int = 512
+    Nz: int = 100
+    
 @dataclass
 class SimulationRequest:
     """
@@ -39,6 +44,7 @@ class SimulationRequest:
     """
 
     mode: EngineMode = "strict_static"
+    grid: GridRequest = field(default_factory=GridRequest)
     params: dict[str, Any] = field(default_factory=dict)
     output: OutputRequest = field(default_factory=OutputRequest)
     runtime: RuntimeRequest = field(default_factory=RuntimeRequest)
@@ -50,9 +56,11 @@ class SimulationRequest:
     def from_dict(cls, data: dict[str, Any]) -> "SimulationRequest":
         output = OutputRequest(**data.get("output", {}))
         runtime = RuntimeRequest(**data.get("runtime", {}))
+        grid = GridRequest(**data.get("grid", {}))
 
         return cls(
             mode=data.get("mode", "strict_static"),
+            grid=grid,
             params=dict(data.get("params", {})),
             output=output,
             runtime=runtime,
@@ -83,3 +91,6 @@ __all__ = [
     "save_request",
     "load_request",
 ]
+
+
+
