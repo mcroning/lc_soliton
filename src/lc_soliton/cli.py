@@ -68,8 +68,28 @@ def main(argv=None) -> int:
     help="List available engine modes.",
     )
 
+    parser.add_argument(
+        "--run-request",
+        metavar="PATH",
+        default=None,
+        help="Run a simulation request JSON file.",
+    )
+
     args = parser.parse_args(argv)
 
+
+    if args.run_request:
+        from .request import load_request
+        from .engine import run_engine
+
+        request = load_request(args.run_request)
+        result = run_engine(request)
+
+        print("request completed:", args.run_request)
+        if isinstance(result, dict):
+            print("result keys:", sorted(result.keys()))
+
+        return 0
 
     if args.list_references:
         from .reference_runner import available_reference_cases
