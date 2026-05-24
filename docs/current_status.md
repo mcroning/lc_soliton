@@ -77,3 +77,23 @@ Create true reference-case execution API:
 
 This should regenerate the trusted case through a stable package entry point,
 rather than requiring direct access to transitional legacy bridge machinery.
+
+## Reference-case API convergence
+
+The reference-case system now has a public dispatcher:
+
+    run_reference_case("strict_static_centroid_drift")
+
+The following user-facing paths should use this shared API:
+
+- CLI:
+      lc-soliton --run-reference strict_static_centroid_drift
+      lc-soliton --validate-reference
+
+- GUI:
+      Validate trusted reference case
+
+- tests:
+      reference CLI consistency tests
+
+This reduces duplicated validation logic and keeps CLI/GUI behavior aligned.
