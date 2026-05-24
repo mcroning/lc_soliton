@@ -62,3 +62,11 @@ Supported modes currently include:
 
 This is intended for CLI, GUI, notebooks, and future job schedulers that need a
 single execution entry point.
+
+The available engine modes can be queried programmatically:
+
+    from lc_soliton import available_engine_modes
+
+    print(available_engine_modes())
+
+This is useful for GUIs, CLIs, and future job schedulers.
