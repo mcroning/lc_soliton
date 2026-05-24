@@ -45,6 +45,9 @@ def run_engine(mode_or_request, *args, **kwargs):
             "Nx": request.grid.Nx,
             "Ny": request.grid.Ny,
             "Nz": request.grid.Nz,
+            "xaper_um": request.geometry.xaper_um,
+            "yaper_um": request.geometry.yaper_um,
+            "dz_um": request.geometry.dz_um,
             "static_max_steps": request.solver.static_max_steps,
         }
         param_data.update(request.params)

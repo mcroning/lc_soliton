@@ -52,6 +52,12 @@ class MaterialRequest:
     De: float = 10.3
 
 @dataclass
+class GeometryRequest:
+    xaper_um: float = 75.0
+    yaper_um: float = 1000.0
+    dz_um: float = 20.0
+
+@dataclass
 class SimulationRequest:
     """
     Canonical high-level request for an LC soliton simulation.
@@ -64,6 +70,7 @@ class SimulationRequest:
     runtime: RuntimeRequest = field(default_factory=RuntimeRequest)
     solver: SolverRequest = field(default_factory=SolverRequest)
     material: MaterialRequest = field(default_factory=MaterialRequest)
+    geometry: GeometryRequest = field(default_factory=GeometryRequest)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,12 +81,14 @@ class SimulationRequest:
         runtime = RuntimeRequest(**data.get("runtime", {}))
         grid = GridRequest(**data.get("grid", {}))
         material = MaterialRequest(**data.get("material", {}))
+        geometry = GeometryRequest(**data.get("geometry", {}))
         solver = SolverRequest(**data.get("solver", {}))
 
         return cls(
             mode=data.get("mode", "strict_static"),
             grid=grid,
             material=material,
+            geometry=geometry,
             solver=solver,
             params=dict(data.get("params", {})),
             output=output,
