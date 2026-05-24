@@ -27,6 +27,7 @@ __all__ = [
     "SimulationRequest",
     "GridRequest",
     "SolverRequest",
+    "MaterialRequest",
     "OutputRequest",
     "RuntimeRequest",
     "save_request",
@@ -95,6 +96,7 @@ def __getattr__(name):
     if name in {
         "SimulationRequest",
         "GridRequest",
+        "MaterialRequest",
         "SolverRequest",
         "OutputRequest",
         "RuntimeRequest",

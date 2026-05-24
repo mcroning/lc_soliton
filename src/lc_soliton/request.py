@@ -45,6 +45,13 @@ class SolverRequest:
     t_stride: int = 1
 
 @dataclass
+class MaterialRequest:
+    ne: float = 1.7
+    no: float = 1.5
+    K: float = 12e-12
+    De: float = 10.3
+
+@dataclass
 class SimulationRequest:
     """
     Canonical high-level request for an LC soliton simulation.
@@ -56,6 +63,7 @@ class SimulationRequest:
     output: OutputRequest = field(default_factory=OutputRequest)
     runtime: RuntimeRequest = field(default_factory=RuntimeRequest)
     solver: SolverRequest = field(default_factory=SolverRequest)
+    material: MaterialRequest = field(default_factory=MaterialRequest)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -65,11 +73,13 @@ class SimulationRequest:
         output = OutputRequest(**data.get("output", {}))
         runtime = RuntimeRequest(**data.get("runtime", {}))
         grid = GridRequest(**data.get("grid", {}))
+        material = MaterialRequest(**data.get("material", {}))
         solver = SolverRequest(**data.get("solver", {}))
 
         return cls(
             mode=data.get("mode", "strict_static"),
             grid=grid,
+            material=material,
             solver=solver,
             params=dict(data.get("params", {})),
             output=output,
