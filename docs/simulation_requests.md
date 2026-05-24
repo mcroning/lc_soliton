@@ -161,3 +161,23 @@ or from Python:
 
 This is useful for GUIs, job launchers, documentation generation, and future
 container or remote execution frontends.
+
+## Request validation
+
+Structured simulation requests are validated before request-driven execution.
+
+Current validation checks include:
+
+- positive grid sizes
+- positive propagation step size
+- positive launch power
+
+Validation occurs when running through:
+
+    run_engine(SimulationRequest(...))
+
+or:
+
+    lc-soliton --run-request request.json
+
+This helps catch malformed requests before expensive simulations begin.
