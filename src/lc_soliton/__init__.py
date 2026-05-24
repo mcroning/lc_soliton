@@ -22,6 +22,7 @@ __all__ = [
     "available_engine_modes",
     "run_reference_case",
     "available_reference_cases",
+    "summarize_reference_case",
 ]
 
 
@@ -69,5 +70,9 @@ def __getattr__(name):
     if name == "available_reference_cases":
         from .reference_runner import available_reference_cases
         return available_reference_cases
+
+    if name == "summarize_reference_case":
+        from .reference_cases import summarize_reference_case
+        return summarize_reference_case
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

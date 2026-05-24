@@ -53,7 +53,7 @@ def load_reference_case(name: str, repo_root: str | Path | None = None) -> dict:
 
 __all__ = [
     "get_reference_case_dir",
-    "load_reference_case,
+    "load_reference_case",
     "summarize_reference_case",
 ]
 
