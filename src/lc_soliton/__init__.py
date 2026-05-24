@@ -22,6 +22,11 @@ __all__ = [
     "available_engine_modes",
     "run_reference_case",
     "available_reference_cases",
+    "load_request",
+    "save_request",
+    "RuntimeRequest",
+    "OutputRequest",
+    "SimulationRequest",
     "summarize_reference_case",
 ]
 
@@ -74,5 +79,15 @@ def __getattr__(name):
     if name == "summarize_reference_case":
         from .reference_cases import summarize_reference_case
         return summarize_reference_case
+
+    if name in {
+        "SimulationRequest",
+        "OutputRequest",
+        "RuntimeRequest",
+        "save_request",
+        "load_request",
+    }:
+        from . import request
+        return getattr(request, name)
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
