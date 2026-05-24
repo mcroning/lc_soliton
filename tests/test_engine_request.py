@@ -8,3 +8,4 @@ def test_run_engine_accepts_request_object_imports():
 
     assert req.mode == "strict_static"
     assert callable(run_engine)
+
