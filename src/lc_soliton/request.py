@@ -1,0 +1,85 @@
+"""
+Canonical simulation request objects.
+
+These are lightweight, JSON-friendly descriptions of what to run.
+They are intended to sit above the current implementation layer.
+"""
+
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+
+EngineMode = Literal[
+    "strict_static",
+    "td_predictor_only",
+    "dg_td_predictor",
+]
+
+
+@dataclass
+class OutputRequest:
+    run_dir: str = "runs/lc_soliton_run"
+    save_slices: bool = True
+    save_full: bool = False
+
+
+@dataclass
+class RuntimeRequest:
+    backend: str = "auto"
+    progress: bool = True
+
+
+@dataclass
+class SimulationRequest:
+    """
+    Canonical high-level request for an LC soliton simulation.
+    """
+
+    mode: EngineMode = "strict_static"
+    params: dict[str, Any] = field(default_factory=dict)
+    output: OutputRequest = field(default_factory=OutputRequest)
+    runtime: RuntimeRequest = field(default_factory=RuntimeRequest)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SimulationRequest":
+        output = OutputRequest(**data.get("output", {}))
+        runtime = RuntimeRequest(**data.get("runtime", {}))
+
+        return cls(
+            mode=data.get("mode", "strict_static"),
+            params=dict(data.get("params", {})),
+            output=output,
+            runtime=runtime,
+        )
+
+
+def save_request(request: SimulationRequest, path: str | Path) -> Path:
+    import json
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(request.to_dict(), indent=2))
+    return path
+
+
+def load_request(path: str | Path) -> SimulationRequest:
+    import json
+
+    path = Path(path)
+    return SimulationRequest.from_dict(json.loads(path.read_text()))
+
+
+__all__ = [
+    "EngineMode",
+    "OutputRequest",
+    "RuntimeRequest",
+    "SimulationRequest",
+    "save_request",
+    "load_request",
+]
