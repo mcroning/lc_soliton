@@ -92,3 +92,22 @@ Run/validate through the public reference-case dispatcher:
 Legacy convenience validation command:
 
     lc-soliton --validate-reference
+
+## Reference-case loading API
+
+Stored reference cases can be loaded from Python:
+
+    from lc_soliton import load_reference_case
+
+    data = load_reference_case("strict_static_centroid_drift")
+
+The returned dictionary may include:
+
+    data["trusted_metrics"]
+    data["summary"]
+    data["reports"]
+    data["config"]
+    data["figures"]
+
+GUIs and notebooks should use this API instead of hardcoding reference-case
+filenames or directory layouts.
