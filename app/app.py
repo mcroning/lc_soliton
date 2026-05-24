@@ -13,6 +13,7 @@ from lc_soliton import (
     LCParams,
     run_static,
     load_reference_case,
+    summarize_reference_case,
     available_engine_modes,
     run_reference_case,
     available_reference_cases,
@@ -105,18 +106,27 @@ if st.button("Show trusted strict-static reference case"):
         st.subheader("z-march reports")
         st.dataframe(pd.DataFrame(data["reports"]))
 
-st.subheader("Regenerate trusted reference case")
+st.subheader("Validate trusted reference case")
+
+summary = summarize_reference_case(selected_reference)
+
+st.caption(
+    f"Reference summary: "
+    f"max_residual_rms={summary.get('max_residual_rms', 'n/a')}"
+)
 
 if st.button("Validate trusted reference case"):
     with st.spinner("Running trusted reference validation..."):
         try:
-            summary = run_reference_case(selected_reference)
+            result = run_reference_case(selected_reference)
         except Exception as exc:
             st.error("Trusted reference validation failed")
             st.exception(exc)
         else:
             st.success("Trusted reference validation passed")
-            st.json(summary)
+
+            if isinstance(result, dict):
+                st.json(result)
 
 run_button = st.button("Run strict static case")
 
