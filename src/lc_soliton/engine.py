@@ -45,6 +45,7 @@ def run_engine(mode_or_request, *args, **kwargs):
             "Nx": request.grid.Nx,
             "Ny": request.grid.Ny,
             "Nz": request.grid.Nz,
+            "static_max_steps": request.solver.static_max_steps,
         }
         param_data.update(request.params)
         
@@ -69,9 +70,9 @@ def run_engine(mode_or_request, *args, **kwargs):
         if mode in ("td_predictor_only", "dg_td_predictor"):
             return ENGINE_MODES[mode](
                 params,
-                Nt=request.params.get("Nt", 100),
-                dt=request.params.get("dt", 5e-4),
-                t_stride=request.params.get("t_stride", 1),
+                Nt=request.solver.Nt,
+                dt=request.solver.dt,
+                t_stride=request.solver.t_stride,
                 **common_kwargs,
             )
 
