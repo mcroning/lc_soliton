@@ -47,3 +47,33 @@ This should become the shared entry point for:
 - validation
 - GUI
 - notebooks
+
+## Recent additions
+
+- Public reference-case loading API:
+      load_reference_case("strict_static_centroid_drift")
+
+- CLI reference-case display:
+      lc-soliton --show-reference strict_static_centroid_drift
+
+- CLI engine mode listing:
+      lc-soliton --list-modes
+
+- Engine dispatcher:
+      run_engine(mode, ...)
+
+- Engine modes can be queried with:
+      available_engine_modes()
+
+- Streamlit GUI now uses the public reference-case API.
+
+- Public runners write environment.json into run directories.
+
+## Next recommended target
+
+Create true reference-case execution API:
+
+    run_reference_case("strict_static_centroid_drift", run_dir=...)
+
+This should regenerate the trusted case through a stable package entry point,
+rather than requiring direct access to transitional legacy bridge machinery.
