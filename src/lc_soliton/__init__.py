@@ -98,7 +98,6 @@ def __getattr__(name):
     if name in {
         "SimulationRequest",
         "LaunchRequest",
-    "LaunchRequest",
         "GridRequest",
         "GeometryRequest",
         "MaterialRequest",
@@ -110,5 +109,10 @@ def __getattr__(name):
     }:
         from . import request
         return getattr(request, name)
+
+
+    if name == "simulation_request_schema":
+        from .request_schema import simulation_request_schema
+        return simulation_request_schema
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

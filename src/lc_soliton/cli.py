@@ -75,8 +75,21 @@ def main(argv=None) -> int:
         help="Run a simulation request JSON file.",
     )
 
+    parser.add_argument(
+        "--request-schema",
+        action="store_true",
+        help="Print the SimulationRequest schema.",
+    )
+
     args = parser.parse_args(argv)
 
+
+    if args.request_schema:
+        import json
+        from .request_schema import simulation_request_schema
+
+        print(json.dumps(simulation_request_schema(), indent=2))
+        return 0
 
     if args.run_request:
         from .request import load_request
