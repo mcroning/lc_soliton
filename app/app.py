@@ -3,6 +3,11 @@ Minimal LC Soliton GUI prototype.
 """
 
 import json
+
+from dataclasses import asdict
+
+params=asdict(params)
+
 from PIL import Image
 
 from pathlib import Path
@@ -11,6 +16,10 @@ import streamlit as st
 
 from lc_soliton import (
     LCParams,
+    SimulationRequest,
+    OutputRequest,
+    RuntimeRequest,
+    run_engine,
     run_static,
     load_reference_case,
     summarize_reference_case,
@@ -149,13 +158,21 @@ if run_button:
 
     with st.spinner("Running simulation..."):
 
-        result = run_static(
-            params,
-            run_dir=run_dir,
-            save_slices=True,
-            save_full=False,
-            progress=None,
+        request = SimulationRequest(
+            mode="strict_static",
+            params=asdict(params),
+            output=OutputRequest(
+                run_dir=str(run_dir),
+                save_slices=True,
+                save_full=False,
+            ),
+            runtime=RuntimeRequest(
+                backend="auto",
+                progress=True,
+            ),
         )
+        
+        result = run_engine(request)
 
         st.success("Run complete")
 
