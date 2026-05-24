@@ -38,3 +38,4 @@ def test_run_engine_executes_static_request():
     assert result is not None
     assert (run_dir / "metadata.json").exists()
     assert (run_dir / "environment.json").exists()
+    assert (run_dir / "request.json").exists()

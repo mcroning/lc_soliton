@@ -3,7 +3,7 @@ Canonical public execution entry points.
 """
 
 from __future__ import annotations
-
+from pathlib import Path
 from .static import run_static
 from .timedependent import run_td
 from .dualgrid import run_dg_td
@@ -42,12 +42,18 @@ def run_engine(mode_or_request, *args, **kwargs):
         mode = request.mode
 
         params = LCParams(**request.params)
+        from .request import save_request
 
         common_kwargs = dict(
             run_dir=request.output.run_dir,
             save_slices=request.output.save_slices,
             save_full=request.output.save_full,
             progress=print if request.runtime.progress else None,
+        )
+
+        save_request(
+            request,
+            Path(request.output.run_dir) / "request.json",
         )
 
         if mode == "strict_static":
