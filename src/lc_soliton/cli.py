@@ -119,6 +119,9 @@ def main(argv=None) -> int:
 
     if args.summary:
         print("lc_soliton version:", __version__)
+
+        print("available engine modes:", ", ".join(available_engine_modes()))
+        
         cfg = derive_lc_constants(RunConfig())
         validate_config(cfg)
         print_config_summary(cfg)
