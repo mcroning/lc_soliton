@@ -84,3 +84,22 @@ By default, generated outputs go under:
 You can override this with:
 
     export LC_SOLITON_RUN_ROOT=/path/to/run/storage
+
+## Run provenance metadata
+
+Public runners automatically save:
+
+    environment.json
+
+inside each run directory.
+
+This records:
+- lc_soliton version
+- Python version
+- NumPy/SciPy versions
+- CuPy/CUDA information (if available)
+- hostname
+- platform
+- timestamp
+
+This helps with reproducibility and debugging.
