@@ -4,6 +4,7 @@ from pathlib import Path
 def test_simulation_request_roundtrip(tmp_path):
     from lc_soliton.request import (
         SimulationRequest,
+        GridRequest,
         OutputRequest,
         RuntimeRequest,
         save_request,
