@@ -6,8 +6,6 @@ import json
 
 from dataclasses import asdict
 
-params=asdict(params)
-
 from PIL import Image
 
 from pathlib import Path
@@ -19,13 +17,16 @@ from lc_soliton import (
     SimulationRequest,
     OutputRequest,
     RuntimeRequest,
+    SolverRequest,
     run_engine,
     run_static,
     load_reference_case,
     summarize_reference_case,
     available_engine_modes,
+    describe_engine_modes,
     run_reference_case,
     available_reference_cases,
+    describe_engine_modes,
 )
 
 
@@ -63,6 +64,56 @@ st.sidebar.header("Beam")
 
 waist_x_um = st.sidebar.number_input("waist x (µm)", value=8.0)
 waist_y_um = st.sidebar.number_input("waist y (µm)", value=8.0)
+
+
+
+mode_descriptions = describe_engine_modes()
+st.caption(
+    "Static and time-dependent liquid-crystal soliton simulation modes."
+)
+
+mode_labels = {
+    "static": "Static",
+    "time_dependent": "Time Dependent",
+    "time_dependent_dual_grid": "Time Dependent (Dual Grid)",
+}
+
+
+
+
+mode_options = available_engine_modes()
+
+selected_mode_label = st.sidebar.selectbox(
+    "Simulation mode",
+    [mode_labels.get(mode, mode) for mode in mode_options],
+)
+
+selected_mode = {
+    mode_labels.get(mode, mode): mode
+    for mode in mode_options
+}[selected_mode_label]
+
+st.sidebar.caption(mode_descriptions.get(selected_mode, ""))
+
+
+
+st.sidebar.header("Solver")
+
+static_max_steps = st.sidebar.number_input(
+    "Static max steps",
+    value=2,
+    min_value=1,
+    step=1,
+)
+
+if selected_mode in {"time_dependent", "time_dependent_dual_grid"}:
+    Nt = st.sidebar.number_input("Time steps", value=100, min_value=1, step=1)
+    dt = st.sidebar.number_input("dt", value=5e-4, format="%.6f")
+    t_stride = st.sidebar.number_input("Output stride", value=1, min_value=1, step=1)
+else:
+    Nt = 100
+    dt = 5e-4
+    t_stride = 1
 
 
 
@@ -137,7 +188,7 @@ if st.button("Validate trusted reference case"):
             if isinstance(result, dict):
                 st.json(result)
 
-run_button = st.button("Run strict static case")
+run_button = st.button(f"Run {selected_mode_label} case")
 
 if run_button:
 
@@ -159,8 +210,14 @@ if run_button:
     with st.spinner("Running simulation..."):
 
         request = SimulationRequest(
-            mode="static",
+            mode=selected_mode,
             params=asdict(params),
+            solver=SolverRequest(
+                static_max_steps=int(static_max_steps),
+                Nt=int(Nt),
+                dt=float(dt),
+                t_stride=int(t_stride),
+            ),
             output=OutputRequest(
                 run_dir=str(run_dir),
                 save_slices=True,
@@ -171,7 +228,7 @@ if run_button:
                 progress=True,
             ),
         )
-        
+
         result = run_engine(request)
 
         st.success("Run complete")
