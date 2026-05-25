@@ -22,6 +22,7 @@ __all__ = [
     "run_dg_td",
     "run_engine",
     "available_engine_modes",
+    "describe_engine_modes",
 
     # requests
     "SimulationRequest",
@@ -130,5 +131,9 @@ def __getattr__(name):
     if name == "run_eigensoliton_case":
         from .eigensoliton_runner import run_eigensoliton_case
         return run_eigensoliton_case
+
+    if name == "describe_engine_modes":
+        from .engine import describe_engine_modes
+        return describe_engine_modes
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

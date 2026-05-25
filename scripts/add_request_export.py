@@ -14,6 +14,13 @@ def main():
         raise SystemExit("Usage: python scripts/add_request_export.py NameRequest")
 
     name = sys.argv[1]
+
+    if not name.endswith("Request"):
+        raise SystemExit(
+            f"{name!r} does not look like a request dataclass. "
+            "This helper only manages *Request exports."
+        )
+
     p = Path("src/lc_soliton/__init__.py")
     s = p.read_text()
 

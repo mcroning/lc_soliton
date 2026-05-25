@@ -238,19 +238,28 @@ def main(argv=None) -> int:
 
     if args.summary:
         print("lc_soliton version:", __version__)
-
-        print("available engine modes:", ", ".join(available_engine_modes()))
-        
+    
+        from .engine import describe_engine_modes
+    
+        descriptions = describe_engine_modes()
+    
+        print("available engine modes:")
+        for mode in available_engine_modes():
+            print(f"  {mode:25s} {descriptions.get(mode, '')}")
+    
         cfg = derive_lc_constants(RunConfig())
         validate_config(cfg)
         print_config_summary(cfg)
         return 0
 
     if args.list_modes:
+        from .engine import describe_engine_modes
+        
+        descriptions = describe_engine_modes()
+        
         print("available engine modes:")
         for mode in available_engine_modes():
-            print(f"  {mode}")
-        return 0
+            print(f"  {mode:25s} {descriptions.get(mode, '')}")
     
     parser.print_help()
     return 0

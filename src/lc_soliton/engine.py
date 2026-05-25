@@ -23,6 +23,17 @@ LEGACY_ENGINE_MODE_ALIASES = {
     "dg_td_predictor": "time_dependent_dual_grid",
 }
 
+ENGINE_MODE_DESCRIPTIONS = {
+    "static": "Static self-consistent propagation",
+    "time_dependent": "Time-dependent evolution",
+    "time_dependent_dual_grid": "Time-dependent evolution using dual-grid director solve",
+}
+
+def describe_engine_modes() -> dict[str, str]:
+    """
+    Return public engine mode descriptions.
+    """
+    return dict(ENGINE_MODE_DESCRIPTIONS)
 
 def canonical_engine_mode(mode: str) -> str:
     return LEGACY_ENGINE_MODE_ALIASES.get(mode, mode)
