@@ -11,6 +11,6 @@ def test_cli_list_modes_runs():
 
     assert result.returncode == 0
     assert "available engine modes:" in result.stdout
-    assert "strict_static" in result.stdout
-    assert "td_predictor_only" in result.stdout
-    assert "dg_td_predictor" in result.stdout
+    assert "static" in result.stdout
+    assert "time_dependent" in result.stdout
+    assert "time_dependent_dual_grid" in result.stdout

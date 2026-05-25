@@ -12,10 +12,20 @@ from .request import SimulationRequest
 
 
 ENGINE_MODES = {
-    "strict_static": run_static,
-    "td_predictor_only": run_td,
-    "dg_td_predictor": run_dg_td,
+    "static": run_static,
+    "time_dependent": run_td,
+    "time_dependent_dual_grid": run_dg_td,
 }
+
+LEGACY_ENGINE_MODE_ALIASES = {
+    "strict_static": "static",
+    "td_predictor_only": "time_dependent",
+    "dg_td_predictor": "time_dependent_dual_grid",
+}
+
+
+def canonical_engine_mode(mode: str) -> str:
+    return LEGACY_ENGINE_MODE_ALIASES.get(mode, mode)
 
 def _add_request_metadata(run_dir: str | Path) -> None:
     import json
@@ -62,7 +72,7 @@ def run_engine(mode_or_request, *args, **kwargs):
         from .request_validation import validate_request
         validate_request(request)
 
-        mode = request.mode
+        mode = canonical_engine_mode(request.mode)
 
         from .request_translate import request_to_lcparams_kwargs
         
@@ -83,12 +93,15 @@ def run_engine(mode_or_request, *args, **kwargs):
             Path(request.output.run_dir) / "request.json",
         )
 
-        if mode == "strict_static":
+        if mode == "static":
             result = run_static(params, **common_kwargs)
             _add_request_metadata(request.output.run_dir)
             return result
 
-        if mode in ("td_predictor_only", "dg_td_predictor"):
+        if mode in (
+            "time_dependent",
+            "time_dependent_dual_grid",
+        ):
             result = ENGINE_MODES[mode](
                 params,
                 Nt=request.solver.Nt,
@@ -104,7 +117,7 @@ def run_engine(mode_or_request, *args, **kwargs):
             f"Available modes: {sorted(ENGINE_MODES)}"
         )
 
-    mode = mode_or_request
+    mode = canonical_engine_mode(mode_or_request)
 
     if mode not in ENGINE_MODES:
         raise ValueError(
