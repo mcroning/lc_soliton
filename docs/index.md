@@ -7,6 +7,7 @@
 - [Project map](project_map.md)
 - [Public API](public_api.md)
 - [Simulation requests](simulation_requests.md)
+- [Eigensoliton profiles](eigensoliton_profiles.md)
 
 ## Development
 
