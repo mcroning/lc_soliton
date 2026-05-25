@@ -145,3 +145,15 @@ and CLI access:
 This is a discovery/loading layer only. The full eigensoliton solver and
 existence-curve machinery still need to be migrated into package-native
 public APIs.
+
+## GUI engine mode milestone
+
+The Streamlit GUI now exposes all public engine modes:
+
+    static
+    time_dependent
+    time_dependent_dual_grid
+
+All three modes can be launched through the request-driven GUI path. The next
+GUI work should focus on mode-specific result visualization, especially avoiding
+misleading flattened z/time plots for time-dependent runs.
