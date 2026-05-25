@@ -7,7 +7,7 @@ def test_cli_run_request_rejects_invalid_request(tmp_path):
     request_path.write_text(
         json.dumps(
             {
-                "mode": "strict_static",
+                "mode": "static",
                 "grid": {
                     "Nx": 0,
                     "Ny": 32,

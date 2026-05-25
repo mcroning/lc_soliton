@@ -24,7 +24,7 @@ These are the intended user-facing imports.
 
 ## Validation
 
-    from lc_soliton.validation import validate_strict_static_centroid_drift
+    from lc_soliton.validation import validate_static_centroid_drift
 
 ## Transitional internals
 
@@ -56,9 +56,9 @@ A canonical dispatcher is available for higher-level tools:
 
 Supported modes currently include:
 
-    strict_static
-    td_predictor_only
-    dg_td_predictor
+    static
+    time_dependent
+    time_dependent_dual_grid
 
 This is intended for CLI, GUI, notebooks, and future job schedulers that need a
 single execution entry point.
@@ -83,11 +83,11 @@ Reference cases can be inspected or validated from the command line.
 
 Show stored metadata:
 
-    lc-soliton --show-reference strict_static_centroid_drift
+    lc-soliton --show-reference static_centroid_drift
 
 Run/validate through the public reference-case dispatcher:
 
-    lc-soliton --run-reference strict_static_centroid_drift
+    lc-soliton --run-reference static_centroid_drift
 
 Legacy convenience validation command:
 
@@ -99,7 +99,7 @@ Stored reference cases can be loaded from Python:
 
     from lc_soliton import load_reference_case
 
-    data = load_reference_case("strict_static_centroid_drift")
+    data = load_reference_case("static_centroid_drift")
 
 The returned dictionary may include:
 

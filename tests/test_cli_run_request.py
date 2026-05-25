@@ -14,7 +14,7 @@ def test_cli_run_request_executes_static(tmp_path):
     request_path.write_text(
         json.dumps(
             {
-                "mode": "strict_static",
+                "mode": "static",
                 "params": {
                     "Nx": 32,
                     "Ny": 32,

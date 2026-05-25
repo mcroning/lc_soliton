@@ -11,7 +11,7 @@ They are represented in Python by:
 ## Example request
 
     {
-      "mode": "strict_static",
+      "mode": "static",
       "params": {
         "Nx": 32,
         "Ny": 32,

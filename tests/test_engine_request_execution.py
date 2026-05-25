@@ -17,7 +17,7 @@ def test_run_engine_executes_static_request():
         shutil.rmtree(run_dir)
 
     req = SimulationRequest(
-        mode="strict_static",
+        mode="static",
         grid=GridRequest(Nx=32, Ny=32, Nz=2),
         params={"static_max_steps": 2},
         output=OutputRequest(

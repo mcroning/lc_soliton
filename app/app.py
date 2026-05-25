@@ -72,13 +72,13 @@ reference_names = available_reference_cases()
 selected_reference = st.selectbox(
     "Reference case",
     reference_names,
-    index=reference_names.index("strict_static_centroid_drift")
-    if "strict_static_centroid_drift" in reference_names
+    index=reference_names.index("static_centroid_drift")
+    if "static_centroid_drift" in reference_names
     else 0,
 )
 
 case_dir = Path(
-    "validation/reference_cases/strict_static_centroid_drift"
+    "validation/reference_cases/static_centroid_drift"
 )
 
 if st.button("Show trusted strict-static reference case"):
@@ -159,7 +159,7 @@ if run_button:
     with st.spinner("Running simulation..."):
 
         request = SimulationRequest(
-            mode="strict_static",
+            mode="static",
             params=asdict(params),
             output=OutputRequest(
                 run_dir=str(run_dir),

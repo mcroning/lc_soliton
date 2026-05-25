@@ -13,9 +13,9 @@ from typing import Any, Literal
 
 
 EngineMode = Literal[
-    "strict_static",
-    "td_predictor_only",
-    "dg_td_predictor",
+    "static",
+    "time_dependent",
+    "time_dependent_dual_grid",
 ]
 
 
@@ -69,7 +69,7 @@ class SimulationRequest:
     Canonical high-level request for an LC soliton simulation.
     """
 
-    mode: EngineMode = "strict_static"
+    mode: EngineMode = "static"
     grid: GridRequest = field(default_factory=GridRequest)
     params: dict[str, Any] = field(default_factory=dict)
     output: OutputRequest = field(default_factory=OutputRequest)
@@ -93,7 +93,7 @@ class SimulationRequest:
         launch = LaunchRequest(**data.get("launch", {}))
 
         return cls(
-            mode=data.get("mode", "strict_static"),
+            mode=data.get("mode", "static"),
             grid=grid,
             material=material,
             geometry=geometry,
