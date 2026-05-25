@@ -36,3 +36,10 @@ def test_run_engine_executes_static_request():
     assert (run_dir / "metadata.json").exists()
     assert (run_dir / "environment.json").exists()
     assert (run_dir / "request.json").exists()
+
+    import json
+
+    metadata = json.loads((run_dir / "metadata.json").read_text())
+
+    assert metadata["request_info"]["translation_version"]
+    assert metadata["request_info"]["package_version"]

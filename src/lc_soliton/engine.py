@@ -17,6 +17,25 @@ ENGINE_MODES = {
     "dg_td_predictor": run_dg_td,
 }
 
+def _add_request_metadata(run_dir: str | Path) -> None:
+    import json
+
+    from .version import __version__
+    from .request_translate import REQUEST_TRANSLATION_VERSION
+
+    path = Path(run_dir) / "metadata.json"
+
+    if not path.exists():
+        return
+
+    metadata = json.loads(path.read_text())
+
+    metadata["request_info"] = {
+        "package_version": __version__,
+        "translation_version": REQUEST_TRANSLATION_VERSION,
+    }
+
+    path.write_text(json.dumps(metadata, indent=2))
 
 def available_engine_modes():
     """
@@ -65,16 +84,20 @@ def run_engine(mode_or_request, *args, **kwargs):
         )
 
         if mode == "strict_static":
-            return run_static(params, **common_kwargs)
+            result = run_static(params, **common_kwargs)
+            _add_request_metadata(request.output.run_dir)
+            return result
 
         if mode in ("td_predictor_only", "dg_td_predictor"):
-            return ENGINE_MODES[mode](
+            result = ENGINE_MODES[mode](
                 params,
                 Nt=request.solver.Nt,
                 dt=request.solver.dt,
                 t_stride=request.solver.t_stride,
                 **common_kwargs,
             )
+            _add_request_metadata(request.output.run_dir)
+            return result
 
         raise ValueError(
             f"Unknown engine mode: {mode}. "
