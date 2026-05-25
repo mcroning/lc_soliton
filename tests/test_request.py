@@ -12,7 +12,8 @@ def test_simulation_request_roundtrip(tmp_path):
 
     req = SimulationRequest(
         mode="static",
-        params={"Nx": 64, "Ny": 64, "Nz": 8},
+        grid=GridRequest(Nx=64, Ny=64, Nz=8),
+        params={},
         output=OutputRequest(run_dir="runs/test_request"),
         runtime=RuntimeRequest(backend="auto", progress=False),
     )
@@ -23,6 +24,6 @@ def test_simulation_request_roundtrip(tmp_path):
     loaded = load_request(path)
 
     assert loaded.mode == "static"
-    assert loaded.params["Nx"] == 64
+    assert loaded.grid.Nx == 64
     assert loaded.output.run_dir == "runs/test_request"
     assert loaded.runtime.progress is False
