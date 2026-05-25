@@ -130,3 +130,18 @@ positive grid sizes, positive dz, and positive launch power.
 
 The legacy flat params dictionary remains available as a bridge while structured
 request sections are gradually wired into execution.
+
+## Eigensoliton profile API milestone
+
+The package now exposes initial public eigensoliton profile utilities:
+
+    list_eigensoliton_profiles(run_dir)
+    load_eigensoliton_profile(profile_path)
+
+and CLI access:
+
+    lc-soliton --list-eigensoliton-profiles RUN_DIR
+
+This is a discovery/loading layer only. The full eigensoliton solver and
+existence-curve machinery still need to be migrated into package-native
+public APIs.
