@@ -44,8 +44,12 @@ __all__ = [
     "summarize_reference_case",
     "run_reference_case",
     "available_reference_cases",
-    "load_eigensoliton_profile",
+
+
+    # eigensolitons
     "list_eigensoliton_profiles",
+    "load_eigensoliton_profile",
+    "run_eigensoliton_case",
 
 ]
 
@@ -122,5 +126,9 @@ def __getattr__(name):
     if name in {"list_eigensoliton_profiles", "load_eigensoliton_profile"}:
         from . import eigensoliton
         return getattr(eigensoliton, name)
+
+    if name == "run_eigensoliton_case":
+        from .eigensoliton_runner import run_eigensoliton_case
+        return run_eigensoliton_case
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
