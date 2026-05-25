@@ -1,13 +1,13 @@
 from pathlib import Path
 import shutil
 
-
 def test_run_engine_executes_static_request():
     from lc_soliton import (
         SimulationRequest,
         GridRequest,
         OutputRequest,
         RuntimeRequest,
+        SolverRequest,
         run_engine,
     )
 
@@ -19,7 +19,8 @@ def test_run_engine_executes_static_request():
     req = SimulationRequest(
         mode="static",
         grid=GridRequest(Nx=32, Ny=32, Nz=2),
-        params={"static_max_steps": 2},
+        solver=SolverRequest(static_max_steps=2),
+        params={},
         output=OutputRequest(
             run_dir=str(run_dir),
             save_slices=False,

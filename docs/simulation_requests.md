@@ -12,12 +12,15 @@ They are represented in Python by:
 
     {
       "mode": "static",
-      "params": {
+      "grid": {
         "Nx": 32,
         "Ny": 32,
-        "Nz": 2,
+        "Nz": 2
+      },
+      "solver": {
         "static_max_steps": 2
       },
+      "params": {},
       "output": {
         "run_dir": "runs/example_request",
         "save_slices": false,
