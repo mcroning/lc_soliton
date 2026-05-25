@@ -45,23 +45,9 @@ def run_engine(mode_or_request, *args, **kwargs):
 
         mode = request.mode
 
-        param_data = {
-            "Nx": request.grid.Nx,
-            "Ny": request.grid.Ny,
-            "Nz": request.grid.Nz,
-            "xaper_um": request.geometry.xaper_um,
-            "yaper_um": request.geometry.yaper_um,
-            "dz_um": request.geometry.dz_um,
-            "static_max_steps": request.solver.static_max_steps,
-            "ne": request.material.ne,
-            "no": request.material.no,
-            "power_norm": request.launch.power_mW,
-            "waist_x_um": request.launch.waist_um,
-            "waist_y_um": request.launch.waist_um,
-            "y_sep_um": request.launch.separation_um,
-
-        }
-        param_data.update(request.params)
+        from .request_translate import request_to_lcparams_kwargs
+        
+        param_data = request_to_lcparams_kwargs(request)
         
         params = LCParams(**param_data)
         from .request import save_request
