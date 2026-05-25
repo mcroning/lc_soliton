@@ -36,6 +36,10 @@ Run it with:
 
     lc-soliton --run-request request.json
 
+The `params` field is an advanced compatibility override layer. Normal user-facing
+controls should go in structured sections such as `grid`, `geometry`, `launch`,
+`material`, `solver`, `runtime`, and `output`.
+
 ## Purpose
 
 Simulation requests provide a portable execution format for:
