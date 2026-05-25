@@ -8,6 +8,7 @@ from typing import Any
 
 from .request import SimulationRequest
 
+REQUEST_TRANSLATION_VERSION = "1"
 
 def request_to_lcparams_kwargs(request: SimulationRequest) -> dict[str, Any]:
     """
@@ -45,4 +46,7 @@ def request_to_lcparams_kwargs(request: SimulationRequest) -> dict[str, Any]:
     return data
 
 
-__all__ = ["request_to_lcparams_kwargs"]
+__all__ = [
+    "REQUEST_TRANSLATION_VERSION",
+    "request_to_lcparams_kwargs",
+]
