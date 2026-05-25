@@ -81,8 +81,26 @@ def main(argv=None) -> int:
         help="Print the SimulationRequest schema.",
     )
 
+    parser.add_argument(
+        "--list-eigensoliton-profiles",
+        metavar="RUN_DIR",
+        default=None,
+        help="List saved eigensoliton profiles in a run directory.",
+    )
+
     args = parser.parse_args(argv)
 
+
+    if args.list_eigensoliton_profiles:
+        from .eigensoliton import list_eigensoliton_profiles
+
+        profiles = list_eigensoliton_profiles(args.list_eigensoliton_profiles)
+
+        print("eigensoliton profiles:")
+        for p in profiles:
+            print(p)
+
+        return 0
 
     if args.request_schema:
         import json
