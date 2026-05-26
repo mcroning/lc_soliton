@@ -347,7 +347,7 @@ if run_button:
     
         else:
             st.caption(
-                "Time-dependent run: plotting final-z maximum intensity versus time/output step."
+                "Time-dependent run: maximum intensity at the final z-slice versus time/output step."
             )
     
             if "k" in df.columns:
