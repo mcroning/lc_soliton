@@ -95,7 +95,11 @@ selected_mode = {
 
 st.sidebar.caption(mode_descriptions.get(selected_mode, ""))
 
+request_path = run_dir / "request.json"
 
+if request_path.exists():
+    with st.expander("Saved simulation request"):
+        st.json(json.loads(request_path.read_text()))
 
 with st.sidebar.expander("Mode notes"):
     if selected_mode == "static":
@@ -221,6 +225,11 @@ if run_button:
 
     run_dir = Path("runs/streamlit_demo")
 
+
+    status_box = st.empty()
+    status_box.info(f"Launching {selected_mode_label} simulation...")
+
+    
     with st.spinner("Running simulation..."):
 
         request = SimulationRequest(
@@ -244,11 +253,11 @@ if run_button:
         )
 
         result = run_engine(request)
+        status_box.success("Simulation finished successfully.")
+    st.success("Run complete")
 
-        st.success("Run complete")
 
-
-        st.subheader("Run summary")
+    st.subheader("Run summary")
         
         metadata_path = run_dir / "metadata.json"
         
