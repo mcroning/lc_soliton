@@ -265,8 +265,8 @@ if run_button:
 
     metadata_path = run_dir / "metadata.json"
     if metadata_path.exists():
-    with st.expander("Metadata"):
-        st.json(json.loads(metadata_path.read_text()))
+        with st.expander("Metadata"):
+            st.json(json.loads(metadata_path.read_text()))
 
     scalar_log = run_dir / "scalar_log.csv"
     if scalar_log.exists():
