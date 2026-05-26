@@ -207,8 +207,15 @@ if st.button("Validate trusted reference case"):
                 st.json(result)
 
 run_button = st.button(f"Run {selected_mode_label} case")
+
 def gui_progress(message):
-    status_box.info(str(message))
+    text = str(message)
+    status_box.info(text)
+
+    if "time step" in text.lower():
+        # leave at indeterminate-ish midpoint for now
+        progress_bar.progress(50)
+        
 if run_button:
 
     params = LCParams(
@@ -226,7 +233,7 @@ if run_button:
 
     run_dir = Path("runs/streamlit_demo")
 
-
+    progress_bar = st.progress(0)
     status_box = st.empty()
     status_box.info(f"Launching {selected_mode_label} simulation...")
 
