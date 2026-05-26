@@ -95,6 +95,8 @@ selected_mode = {
 
 st.sidebar.caption(mode_descriptions.get(selected_mode, ""))
 
+
+
 with st.sidebar.expander("Mode notes"):
     if selected_mode == "static":
         st.write(
