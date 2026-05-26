@@ -95,7 +95,19 @@ selected_mode = {
 
 st.sidebar.caption(mode_descriptions.get(selected_mode, ""))
 
-
+with st.sidebar.expander("Mode notes"):
+    if selected_mode == "static":
+        st.write(
+            "Static mode computes a self-consistent z-marched steady-state solution."
+        )
+    elif selected_mode == "time_dependent":
+        st.write(
+            "Time-dependent mode evolves the LC director response on the full grid."
+        )
+    elif selected_mode == "time_dependent_dual_grid":
+        st.write(
+            "Dual-grid time-dependent mode evolves the optics on the full grid while solving the LC director on a coarser grid."
+        )
 
 st.sidebar.header("Solver")
 
