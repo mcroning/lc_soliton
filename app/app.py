@@ -331,6 +331,8 @@ if run_button:
 
         st.subheader("Scalar diagnostics")
         df = pd.read_csv(scalar_log)
+        with st.expander("Scalar log columns"):
+            st.write(list(df.columns))
         
         with st.expander("Scalar log table"):
             st.dataframe(df)
