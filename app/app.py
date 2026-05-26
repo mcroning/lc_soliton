@@ -290,94 +290,102 @@ if run_button:
         progress_bar.progress(100)
     st.success("Run complete")
 
-
     st.subheader("Run summary")
-        
+
     metadata_path = run_dir / "metadata.json"
-    
+    metadata = {}
+
     if metadata_path.exists():
-        import json
-    
         metadata = json.loads(metadata_path.read_text())
-    
+
         col1, col2, col3 = st.columns(3)
-    
+
         col1.metric("Mode", metadata.get("mode", "n/a"))
-        col2.metric("Grid", f"{metadata.get('Nx')}×{metadata.get('Ny')}×{metadata.get('Nz')}")
+        col2.metric(
+            "Grid",
+            f"{metadata.get('Nx')}×{metadata.get('Ny')}×{metadata.get('Nz')}",
+        )
         col3.metric("Backend", metadata.get("backend", "n/a"))
-    
+
         st.caption(
             f"dz = {metadata.get('dz_um', 'n/a')} µm, "
             f"nsub = {metadata.get('nsub', 'n/a')}"
         )
 
+    summary_tab, diagnostics_tab, files_tab = st.tabs(    
+        ["Summary", "Diagnostics", "Files / provenance"]   
+    )
+    with diagnostics_tab:   
+        scalar_log = run_dir / "scalar_log.csv"
     
-    with st.expander("Raw result dictionary"):
-        st.json(result)
+        if scalar_log.exists():
+            import pandas as pd
     
-    with st.expander("Generated files"):
-        files = sorted(run_dir.glob("*"))
-        for f in files:
-            st.write(f.name)
-
-    metadata_path = run_dir / "metadata.json"
-    if metadata_path.exists():
-        with st.expander("Metadata"):
-            st.json(json.loads(metadata_path.read_text()))
-
-    scalar_log = run_dir / "scalar_log.csv"
-    if scalar_log.exists():
-        import pandas as pd
-
-        st.subheader("Scalar diagnostics")
-        df = pd.read_csv(scalar_log)
-        with st.expander("Scalar log columns"):
-            st.write(list(df.columns))
-        
-        with st.expander("Scalar log table"):
-            st.dataframe(df)
-
-    if selected_mode == "static":
-        st.info(
-            "Static result view: z-dependent quantities are shown along the propagation direction."
-        )
-    elif selected_mode == "time_dependent":
-        st.info(
-            "Time-dependent result view: scalar summaries are reduced to a final-z time trace."
-        )
-    elif selected_mode == "time_dependent_dual_grid":
-        st.info(
-            "Dual-grid TD result view: scalar summaries are reduced to a final-z time trace; director dynamics were solved on the coarse grid."
-        )
-
-
+            st.subheader("Scalar diagnostics")
+            df = pd.read_csv(scalar_log)
     
-    if "Imax" in df.columns:
-        st.subheader("Intensity summary")
+            if selected_mode == "static":
+                st.info(
+                    "Static result view: z-dependent quantities are shown along the propagation direction."
+                )
+            elif selected_mode == "time_dependent":
+                st.info(
+                    "Time-dependent result view: scalar summaries are reduced to a final-z time trace."
+                )
+            elif selected_mode == "time_dependent_dual_grid":
+                st.info(
+                    "Dual-grid TD result view: scalar summaries are reduced to a final-z time trace; director dynamics were solved on the coarse grid."
+                )
     
-        if selected_mode == "static":
-            if "z_um" in df.columns:
-                st.caption("Static run: maximum intensity versus propagation distance.")
-                st.line_chart(df.set_index("z_um")["Imax"])
+            if "Imax" in df.columns:
+                st.subheader("Intensity summary")
+    
+                if selected_mode == "static":
+                    if "z_um" in df.columns:
+                        st.caption("Static run: maximum intensity versus propagation distance.")
+                        st.line_chart(df.set_index("z_um")["Imax"])
+                    else:
+                        st.line_chart(df["Imax"])
+    
+                else:
+                    st.caption(
+                        "Time-dependent run: maximum intensity at the final z-slice versus time/output step."
+                    )
+    
+                    if "k" in df.columns:
+                        final_k = df["k"].max()
+                        df_final = df[df["k"] == final_k].copy()
+                    else:
+                        df_final = df.copy()
+    
+                    if "t" in df_final.columns:
+                        st.line_chart(df_final.set_index("t")["Imax"])
+                    elif "jt" in df_final.columns:
+                        st.line_chart(df_final.set_index("jt")["Imax"])
+                    else:
+                        st.line_chart(df_final["Imax"])
+    
+            with st.expander("Scalar log columns"):
+                st.write(list(df.columns))
+    
+            with st.expander("Scalar log table"):
+                st.dataframe(df)
+    with files_tab:
+        with st.expander("Saved simulation request"):
+            request_path = run_dir / "request.json"
+            if request_path.exists():
+                st.json(json.loads(request_path.read_text()))
             else:
-                st.line_chart(df["Imax"])
+                st.write("No request.json found.")
     
-        else:
-            st.caption(
-                "Time-dependent run: maximum intensity at the final z-slice versus time/output step."
-            )
+        with st.expander("Generated files"):
+            files = sorted(run_dir.glob("*"))
+            for f in files:
+                st.write(f.name)
     
-            if "k" in df.columns:
-                final_k = df["k"].max()
-                df_final = df[df["k"] == final_k].copy()
-            else:
-                df_final = df.copy()
+        if metadata_path.exists():
+            with st.expander("Metadata"):
+                st.json(metadata)
     
-            if "t" in df_final.columns:
-                st.line_chart(df_final.set_index("t")["Imax"])
-            elif "jt" in df_final.columns:
-                st.line_chart(df_final.set_index("jt")["Imax"])
-            else:
-                st.line_chart(df_final["Imax"])
-
-    st.write(result)
+        with st.expander("Raw result dictionary"):
+            st.json(result)
