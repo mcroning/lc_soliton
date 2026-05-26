@@ -335,6 +335,21 @@ if run_button:
         with st.expander("Scalar log table"):
             st.dataframe(df)
 
+    if selected_mode == "static":
+        st.info(
+            "Static result view: z-dependent quantities are shown along the propagation direction."
+        )
+    elif selected_mode == "time_dependent":
+        st.info(
+            "Time-dependent result view: scalar summaries are reduced to a final-z time trace."
+        )
+    elif selected_mode == "time_dependent_dual_grid":
+        st.info(
+            "Dual-grid TD result view: scalar summaries are reduced to a final-z time trace; director dynamics were solved on the coarse grid."
+        )
+
+
+    
     if "Imax" in df.columns:
         st.subheader("Intensity summary")
     
