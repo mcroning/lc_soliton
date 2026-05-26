@@ -224,6 +224,18 @@ def gui_progress(message):
             progress_bar.progress(min(max(frac, 0.0), 1.0))
             return
 
+
+
+    m = re.search(r"time step\s+(\d+)/(\d+)", text.lower())
+    
+    if m:
+        current = int(m.group(1))
+        total = int(m.group(2))
+    
+        if total > 0:
+            frac = current / total
+            progress_bar.progress(min(max(frac, 0.0), 1.0))
+            return
     if "time step" in text.lower():
         progress_bar.progress(50)
         
