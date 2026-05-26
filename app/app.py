@@ -255,27 +255,28 @@ if run_button:
             )
 
     
-    st.subheader("Result")
-    st.json(result)
-
-    st.subheader("Generated files")
-
-    files = sorted(run_dir.glob("*"))
-    for f in files:
-        st.write(f.name)
+    with st.expander("Raw result dictionary"):
+        st.json(result)
+    
+    with st.expander("Generated files"):
+        files = sorted(run_dir.glob("*"))
+        for f in files:
+            st.write(f.name)
 
     metadata_path = run_dir / "metadata.json"
     if metadata_path.exists():
-        st.subheader("Metadata")
-        st.json(metadata_path.read_text())
+    with st.expander("Metadata"):
+        st.json(json.loads(metadata_path.read_text()))
 
     scalar_log = run_dir / "scalar_log.csv"
     if scalar_log.exists():
         import pandas as pd
 
-        st.subheader("Scalar log")
+        st.subheader("Scalar diagnostics")
         df = pd.read_csv(scalar_log)
-        st.dataframe(df)
+        
+        with st.expander("Scalar log table"):
+            st.dataframe(df)
 
     if "Imax" in df.columns:
         st.subheader("Intensity summary")
