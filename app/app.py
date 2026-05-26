@@ -207,7 +207,8 @@ if st.button("Validate trusted reference case"):
                 st.json(result)
 
 run_button = st.button(f"Run {selected_mode_label} case")
-
+def gui_progress(message):
+    status_box.info(str(message))
 if run_button:
 
     params = LCParams(
@@ -252,7 +253,9 @@ if run_button:
             ),
         )
 
-        result = run_engine(request)
+
+        
+        result = run_engine(request, progress_callback=gui_progress)
         status_box.success("Simulation finished successfully.")
     st.success("Run complete")
 

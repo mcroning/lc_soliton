@@ -65,7 +65,7 @@ def available_engine_modes():
     return sorted(ENGINE_MODES)
 
 
-def run_engine(mode_or_request, *args, **kwargs):
+def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
     """
     Canonical public execution dispatcher.
 
@@ -96,7 +96,11 @@ def run_engine(mode_or_request, *args, **kwargs):
             run_dir=request.output.run_dir,
             save_slices=request.output.save_slices,
             save_full=request.output.save_full,
-            progress=print if request.runtime.progress else None,
+            progress=(
+                progress_callback
+                if progress_callback is not None
+                else print if request.runtime.progress else None
+            ),
         )
 
         save_request(
