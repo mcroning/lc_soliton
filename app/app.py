@@ -207,13 +207,24 @@ if st.button("Validate trusted reference case"):
                 st.json(result)
 
 run_button = st.button(f"Run {selected_mode_label} case")
+import re
 
 def gui_progress(message):
     text = str(message)
     status_box.info(text)
 
+    m = re.search(r"z\s+(\d+)/(\d+)", text)
+
+    if m:
+        current = int(m.group(1))
+        total = int(m.group(2))
+
+        if total > 0:
+            frac = current / total
+            progress_bar.progress(min(max(frac, 0.0), 1.0))
+            return
+
     if "time step" in text.lower():
-        # leave at indeterminate-ish midpoint for now
         progress_bar.progress(50)
         
 if run_button:
@@ -264,6 +275,7 @@ if run_button:
         
         result = run_engine(request, progress_callback=gui_progress)
         status_box.success("Simulation finished successfully.")
+        progress_bar.progress(100)
     st.success("Run complete")
 
 
