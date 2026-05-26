@@ -255,7 +255,32 @@ if run_button:
         df = pd.read_csv(scalar_log)
         st.dataframe(df)
 
-        if "z_um" in df.columns and "Imax" in df.columns:
-            st.line_chart(df.set_index("z_um")["Imax"])
+    if "Imax" in df.columns:
+        st.subheader("Intensity summary")
+    
+        if selected_mode == "static":
+            if "z_um" in df.columns:
+                st.caption("Static run: maximum intensity versus propagation distance.")
+                st.line_chart(df.set_index("z_um")["Imax"])
+            else:
+                st.line_chart(df["Imax"])
+    
+        else:
+            st.caption(
+                "Time-dependent run: plotting final-z maximum intensity versus time/output step."
+            )
+    
+            if "k" in df.columns:
+                final_k = df["k"].max()
+                df_final = df[df["k"] == final_k].copy()
+            else:
+                df_final = df.copy()
+    
+            if "t" in df_final.columns:
+                st.line_chart(df_final.set_index("t")["Imax"])
+            elif "jt" in df_final.columns:
+                st.line_chart(df_final.set_index("jt")["Imax"])
+            else:
+                st.line_chart(df_final["Imax"])
 
     st.write(result)
