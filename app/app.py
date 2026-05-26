@@ -233,6 +233,28 @@ if run_button:
 
         st.success("Run complete")
 
+
+        st.subheader("Run summary")
+        
+        metadata_path = run_dir / "metadata.json"
+        
+        if metadata_path.exists():
+            import json
+        
+            metadata = json.loads(metadata_path.read_text())
+        
+            col1, col2, col3 = st.columns(3)
+        
+            col1.metric("Mode", metadata.get("mode", "n/a"))
+            col2.metric("Grid", f"{metadata.get('Nx')}×{metadata.get('Ny')}×{metadata.get('Nz')}")
+            col3.metric("Backend", metadata.get("backend", "n/a"))
+        
+            st.caption(
+                f"dz = {metadata.get('dz_um', 'n/a')} µm, "
+                f"nsub = {metadata.get('nsub', 'n/a')}"
+            )
+
+    
     st.subheader("Result")
     st.json(result)
 
