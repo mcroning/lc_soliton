@@ -149,13 +149,19 @@ def main(argv=None) -> int:
 
     if args.run_reference:
         from .reference_runner import run_reference_case
-
+    
         summary = run_reference_case(args.run_reference)
         print("reference case passed:", args.run_reference)
-
-        if isinstance(summary, dict) and "max_residual_rms" in summary:
-            print("max_residual_rms:", summary["max_residual_rms"])
-
+    
+        metrics = summary.get("new_summary", summary) if isinstance(summary, dict) else {}
+    
+        if "max_residual_rms" in metrics:
+            print("max_residual_rms:", metrics["max_residual_rms"])
+        if "max_residual_max" in metrics:
+            print("max_residual_max:", metrics["max_residual_max"])
+        if "P_final" in metrics:
+            print("P_final:", metrics["P_final"])
+    
         return 0
 
     if args.show_reference:
@@ -198,10 +204,19 @@ def main(argv=None) -> int:
 
     if args.validate_reference:
         from .reference_runner import run_reference_case
-
+    
         summary = run_reference_case("strict_static_centroid_drift")
-        print("strict static reference validation passed")
-        print("max_residual_rms:", summary["max_residual_rms"])
+        metrics = summary.get("new_summary", summary) if isinstance(summary, dict) else {}
+    
+        print("reference validation passed: strict_static_centroid_drift")
+    
+        if "max_residual_rms" in metrics:
+            print("max_residual_rms:", metrics["max_residual_rms"])
+        if "max_residual_max" in metrics:
+            print("max_residual_max:", metrics["max_residual_max"])
+        if "P_final" in metrics:
+            print("P_final:", metrics["P_final"])
+    
         return 0
 
 

@@ -1,5 +1,15 @@
-def test_run_engine_accepts_request_object_imports():
-    from lc_soliton import SimulationRequest, run_engine
+def test_run_engine_accepts_request_object_imports(tmp_path):
+    from lc_soliton import (
+        SimulationRequest,
+        GridRequest,
+        GeometryRequest,
+        MaterialRequest,
+        LaunchRequest,
+        SolverRequest,
+        OutputRequest,
+        RuntimeRequest,
+        run_engine,
+    )
 
     req = SimulationRequest(
         mode="static",

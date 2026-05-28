@@ -8,7 +8,6 @@ from pathlib import Path
 import json
 
 
-
 def get_reference_case_dir(name: str, repo_root: str | Path | None = None) -> Path:
     if repo_root is None:
         repo_root = Path.cwd()

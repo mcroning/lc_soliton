@@ -21,11 +21,7 @@ EngineMode = Literal[
 
 from dataclasses import dataclass, field
 
-@dataclass
-class GridRequest:
-    Nx: int = 256
-    Ny: int = 256
-    Nz: int = 50
+
 
 @dataclass
 class GeometryRequest:
@@ -46,6 +42,8 @@ class MaterialRequest:
     theta_clamp_min: float = -1.2
     theta_clamp_max: float = 1.2
     theta_z_gamma: float = 0.0
+    K: float = 1.2e-11
+    De: float = 10.3
 
 @dataclass
 class LaunchRequest:
@@ -101,7 +99,7 @@ class SolverRequest:
 
 @dataclass
 class SimulationRequest:
-    mode: str
+    mode: str = "static"
     grid: GridRequest = field(default_factory=GridRequest)
     geometry: GeometryRequest = field(default_factory=GeometryRequest)
     material: MaterialRequest = field(default_factory=MaterialRequest)
@@ -120,6 +118,12 @@ class SimulationRequest:
         return data
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SimulationRequest":
+        data = dict(data)
+    
+        if "params" in data and data["params"]:
+            from .request_translate import legacy_params_to_request_dict
+            data = legacy_params_to_request_dict(data)
+    
         output = OutputRequest(**data.get("output", {}))
         runtime = RuntimeRequest(**data.get("runtime", {}))
         grid = GridRequest(**data.get("grid", {}))
@@ -127,17 +131,19 @@ class SimulationRequest:
         geometry = GeometryRequest(**data.get("geometry", {}))
         solver = SolverRequest(**data.get("solver", {}))
         launch = LaunchRequest(**data.get("launch", {}))
-
+        boundary = BoundaryRequest(**data.get("boundary", {}))
+    
         return cls(
             mode=data.get("mode", "static"),
             grid=grid,
             material=material,
             geometry=geometry,
             solver=solver,
-            params=dict(data.get("params", {})),
+            launch=launch,
+            boundary=boundary,
             output=output,
             runtime=runtime,
-            launch=launch,
+            params=None,
         )
 
 
@@ -159,6 +165,12 @@ def load_request(path: str | Path) -> SimulationRequest:
 
 __all__ = [
     "EngineMode",
+    "GridRequest",
+    "GeometryRequest",
+    "MaterialRequest",
+    "LaunchRequest",
+    "BoundaryRequest",
+    "SolverRequest",
     "OutputRequest",
     "RuntimeRequest",
     "SimulationRequest",
