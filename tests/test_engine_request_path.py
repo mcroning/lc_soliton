@@ -55,7 +55,7 @@ def test_run_engine_accepts_typed_static_request(tmp_path):
             save_full=False,
         ),
         runtime=RuntimeRequest(
-            backend="cpu",
+            backend="auto",
             progress=False,
         ),
     )

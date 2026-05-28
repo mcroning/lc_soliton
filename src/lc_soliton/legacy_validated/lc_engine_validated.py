@@ -88,105 +88,6 @@ from ..core.context import (
 from ..core.storage import LightStore
 
 
-# -----------------------------------------------------------------------------
-# Local package-smoke fallback numerics
-# -----------------------------------------------------------------------------
-
-
-def _fft2(xp, a, axes=(-2, -1)):
-    return _cupy_fft.fft2(a, axes=axes) if (_HAS_CUPY and xp is _cupy) else np.fft.fft2(a, axes=axes)
-
-
-def _ifft2(xp, a, axes=(-2, -1)):
-    return _cupy_fft.ifft2(a, axes=axes) if (_HAS_CUPY and xp is _cupy) else np.fft.ifft2(a, axes=axes)
-
-
-def _compute_h_local(ctx: LCContext, dz_um: float):
-    key = round(float(dz_um), 12)
-    if key in ctx._h_cache:
-        return ctx._h_cache[key]
-    xp = ctx.xp
-    lm = float(ctx.p.wavelength_um)
-    refin = float(ctx.refin)
-    arg = 1.0 - (lm / refin) ** 2 * ctx.fxy2
-    h = xp.where(arg > 0, xp.exp(2j * xp.pi * refin * dz_um / lm * xp.sqrt(xp.maximum(arg, 0))), 0)
-    ctx._h_cache[key] = h.astype(xp.complex64)
-    return ctx._h_cache[key]
-
-
-def _hop_linear_local(ctx: LCContext, amp, h):
-    xp = ctx.xp
-    A = _fft2(xp, amp, axes=(-2, -1))
-    A *= h
-    out = _ifft2(xp, A, axes=(-2, -1)).astype(xp.complex64)
-    if ctx.windowxy is not None:
-        out *= ctx.windowxy[None, :, :]
-    return out
-
-
-def _lc_dn_local(theta, ctx: LCContext):
-    return (compute_neff(theta, ne=ctx.p.ne, no=ctx.p.no, xp=ctx.xp) - ctx.refin).astype(ctx.xp.float32)
-
-
-def _propagate_slice_local(ctx: LCContext, amp, theta, *, nsub: int, dz_sub: float, h_sub):
-    xp = ctx.xp
-    for _ in range(int(nsub)):
-        phase = xp.exp((1j * xp.float32(ctx.kout * dz_sub)) * _lc_dn_local(theta, ctx)).astype(xp.complex64)
-        amp = (amp * phase[None, :, :]).astype(xp.complex64)
-        amp = _hop_linear_local(ctx, amp, h_sub)
-    return amp
-
-
-def _laplacian_local(theta, du: float, dv: float, xp):
-    th = theta.astype(xp.float32, copy=False)
-    lap = xp.zeros_like(th)
-    yp = xp.roll(th, -1, axis=1)
-    ym = xp.roll(th, 1, axis=1)
-    lap[1:-1, :] = ((th[2:, :] - 2 * th[1:-1, :] + th[:-2, :]) / (du * du) + (yp[1:-1, :] - 2 * th[1:-1, :] + ym[1:-1, :]) / (dv * dv))
-    return lap
-
-
-def _residual_local(theta, I, ctx: LCContext):
-    p = ctx.p
-    xp = ctx.xp
-    R = (_laplacian_local(theta, ctx.du_lc, ctx.dv_lc, xp) + (p.b + p.bi * I) * xp.sin(2 * theta)) / p.mobility
-    R[0, :] = 0
-    R[-1, :] = 0
-    return R.astype(xp.float32)
-
-
-def _simple_static_smoke_slice(ctx: LCContext, amp, theta_seed, *, nsub: int, dz_sub: float, h_sub):
-    """Small CPU-safe smoke path. Not the trusted physics branch."""
-    xp = ctx.xp
-    p = ctx.p
-    I_b = intensity(amp, p.coherent, xp=xp)
-    theta = theta_seed.astype(xp.float32, copy=True)
-    theta[0, :] = xp.float32(p.theta_bc)
-    theta[-1, :] = xp.float32(p.theta_bc)
-
-    # Use a very conservative explicit relaxation. This exists only so CPU tests
-    # can exercise IO/request plumbing; trusted static uses validated_core on GPU.
-    dtau = min(float(p.dtau_static), 1e-5)
-    for _ in range(max(1, min(int(p.static_max_steps), 20))):
-        R = _residual_local(theta, I_b, ctx)
-        theta[1:-1, :] += xp.float32(dtau) * R[1:-1, :]
-        theta = xp.clip(theta, p.theta_clamp_min, p.theta_clamp_max).astype(xp.float32)
-        theta[0, :] = xp.float32(p.theta_bc)
-        theta[-1, :] = xp.float32(p.theta_bc)
-
-    amp_out = _propagate_slice_local(ctx, amp.copy(), theta, nsub=nsub, dz_sub=dz_sub, h_sub=h_sub)
-    I_a = intensity(amp_out, p.coherent, xp=xp)
-    I_mid = 0.5 * (I_b + I_a)
-    R = _residual_local(theta, I_mid, ctx)
-    Rint = R[1:-1, :]
-    info = dict(
-        rrms=float(asnumpy(xp.sqrt(xp.mean(Rint * Rint)))),
-        rmax=float(asnumpy(xp.max(xp.abs(Rint)))),
-        converged=True,
-        method="package_smoke",
-    )
-    return theta, I_mid, amp_out, info
-
 
 # -----------------------------------------------------------------------------
 # Runner utilities
@@ -235,16 +136,10 @@ def _prepare_substeps(ctx: LCContext, params: LCParams, *, use_core: bool):
     return int(nsub), float(dz_sub), float(phi), _compute_h_local(ctx, dz_sub), _compute_h_local(ctx, 0.5 * dz_sub)
 
 
-def _make_scalar_info_from_residual(theta, I_mid, ctx: LCContext) -> Dict[str, Any]:
-    R = lc_residual64(theta, I_mid, b=ctx.b, bi=ctx.bi, du=ctx.du, dv=ctx.dv, mobility=ctx.mobility)
-    stats = residual_stats_2d(R)
-    return normalize_info(dict(rrms=stats["rms_interior"], rmax=stats["max_interior"], converged=True))
-
 
 # -----------------------------------------------------------------------------
 # Mode implementations
 # -----------------------------------------------------------------------------
-
 
 def _run_static(
     *,
@@ -278,48 +173,55 @@ def _run_static(
             if progress:
                 progress("run stopped by user")
             break
-
+    
         theta_seed = ctx.theta_full[k - 1] if k > 0 else ctx.theta_bias_2d.copy()
-
-        if use_legacy_static:
-            tp = ctx.theta_full[k - 1] if k > 0 else ctx.theta_full[k]
-            tn = ctx.theta_full[k + 1] if (k + 1) < ctx.Nz else ctx.theta_full[k]
-            theta, I_mid, amp, info = strict_static_relax_slice_selfconsistent(
-                amp,
-                theta_seed,
-                tp,
-                tn,
-                ctx,
-                dz_sub=float(dz_sub),
-                Nsub=int(nsub),
-                h_sub=h_sub,
-                Ahat=plans.Ahat,
-                plan_f=plans.plan_f,
-                plan_i=plans.plan_i,
-                sS=plans.sS,
-                offS=plans.offS,
-                diagS=plans.diagS,
-                lamS=plans.lamS,
-                use_linear_seed=True,
-                early_accept_linear_seed=True,
-                residual_tol_max=float(params.static_tol_max),
-                residual_tol_rms=float(params.static_tol_rms),
-                max_outer_passes=8,
-                max_selfcons_passes=int(params.static_selfcons_passes),
-                selfcons_tol_theta=1e-4,
-                selfcons_tol_I=1e-4,
-                verbose=False,
-            )
-            info = normalize_info(info)
-        else:
-            theta, I_mid, amp, info = _simple_static_smoke_slice(ctx, amp, theta_seed, nsub=nsub, dz_sub=dz_sub, h_sub=h_sub)
-
+    
+        tp = ctx.theta_full[k - 1] if k > 0 else ctx.theta_full[k]
+        tn = ctx.theta_full[k + 1] if (k + 1) < ctx.Nz else ctx.theta_full[k]
+    
+        theta, I_mid, amp, info = strict_static_relax_slice_selfconsistent(
+            amp,
+            theta_seed,
+            tp,
+            tn,
+            ctx,
+            dz_sub=float(dz_sub),
+            Nsub=int(nsub),
+            h_sub=h_sub,
+            Ahat=plans.Ahat,
+            plan_f=plans.plan_f,
+            plan_i=plans.plan_i,
+            sS=plans.sS,
+            offS=plans.offS,
+            diagS=plans.diagS,
+            lamS=plans.lamS,
+            use_linear_seed=True,
+            early_accept_linear_seed=True,
+            residual_tol_max=float(params.static_tol_max),
+            residual_tol_rms=float(params.static_tol_rms),
+            max_outer_passes=8,
+            max_selfcons_passes=int(params.static_selfcons_passes),
+            selfcons_tol_theta=1e-4,
+            selfcons_tol_I=1e-4,
+            verbose=False,
+        )
+    
+        info = normalize_info(info)
+    
         ctx.theta_full[k] = theta
         store.save(0, k, I_mid, theta, info)
-
-        if progress and (k == 0 or (k + 1) % max(1, ctx.Nz // 20) == 0 or k == ctx.Nz - 1):
-            progress(f"static z {k+1}/{ctx.Nz}  Imax={float(asnumpy(xp.max(I_mid))):.3e}  Rrms={float(info.get('rrms', np.nan)):.3e}")
-
+    
+        if progress and (
+            k == 0
+            or (k + 1) % max(1, ctx.Nz // 20) == 0
+            or k == ctx.Nz - 1
+        ):
+            progress(
+                f"static z {k+1}/{ctx.Nz}  "
+                f"Imax={float(asnumpy(xp.max(I_mid))):.3e}  "
+                f"Rrms={float(info.get('rrms', np.nan)):.3e}"
+            )
+    
     return stopped
 
 
@@ -547,7 +449,12 @@ def run_lc_validated(
     use_legacy_static = _HAS_CUPY and xp is _cupy and mode == "strict_static"
     use_legacy_td = _HAS_CUPY and xp is _cupy and mode == "td_predictor_only"
     use_legacy_dg_td = False
-
+    if mode == "strict_static" and not use_legacy_static:   
+        raise RuntimeError(    
+            "Validated strict_static currently requires CuPy/GPU. "    
+            "CPU physics execution is not validated yet."   
+        )
+    
     if mode in {"strict_static", "td_predictor_only"} and not (_HAS_CUPY and xp is _cupy):
         if mode == "td_predictor_only":
             raise RuntimeError("Validated TD predictor requires CuPy/GPU. Use backend='auto' on a GPU node.")
