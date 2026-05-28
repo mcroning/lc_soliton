@@ -10,6 +10,7 @@ def test_request_to_lcparams_kwargs_contains_structured_fields():
     from lc_soliton.request_translate import request_to_lcparams_kwargs
 
     req = SimulationRequest(
+        mode="static",
         grid=GridRequest(Nx=10, Ny=11, Nz=12),
         geometry=GeometryRequest(xaper_um=70, yaper_um=800, dz_um=5),
         material=MaterialRequest(ne=1.71, no=1.52),

@@ -29,6 +29,8 @@ ENGINE_MODE_DESCRIPTIONS = {
     "time_dependent_dual_grid": "Time-dependent evolution using dual-grid director solve",
 }
 
+
+
 def describe_engine_modes() -> dict[str, str]:
     """
     Return public engine mode descriptions.
@@ -58,11 +60,11 @@ def _add_request_metadata(run_dir: str | Path) -> None:
 
     path.write_text(json.dumps(metadata, indent=2))
 
-def available_engine_modes():
-    """
-    Return sorted list of supported engine modes.
-    """
-    return sorted(ENGINE_MODES)
+def available_engine_modes(include_experimental: bool = False):
+    modes = ["static", "time_dependent"]
+    if include_experimental:
+        modes.append("time_dependent_dual_grid")
+    return modes
 
 
 def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
@@ -77,9 +79,18 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
 
         run_engine(SimulationRequest(...))
     """
+
+
+
     if isinstance(mode_or_request, SimulationRequest):
         request = mode_or_request
-
+    
+        if getattr(request, "params", None):
+            raise ValueError(
+                "SimulationRequest.params is deprecated. "
+                "Use grid/geometry/material/launch/boundary/solver sections."
+            )
+    
         from .request_validation import validate_request
         validate_request(request)
 
