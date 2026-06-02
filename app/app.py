@@ -63,7 +63,7 @@ display_mode_labels = {
 st.sidebar.header("Grid")
 Nx = st.sidebar.slider("Nx", 32, 512, 256, step=32)
 Ny = st.sidebar.slider("Ny", 32, 512, 256, step=32)
-Nz = st.sidebar.slider("Nz", 4, 200, 50)
+Nz = st.sidebar.slider("Nz", 4, 600, 50)
 
 st.sidebar.header("Geometry")
 xaper_um = st.sidebar.number_input("xaper (µm)", value=75.0)
@@ -243,11 +243,7 @@ if run_button:
 
     request = SimulationRequest(
         mode=selected_mode,
-        grid=GridRequest(
-            Nx=int(Nx),
-            Ny=int(Ny),
-            Nz=int(Nz),
-        ),
+        grid=GridRequest(Nx=int(Nx), Ny=int(Ny), Nz=int(Nz)),
         geometry=GeometryRequest(
             xaper_um=float(xaper_um),
             yaper_um=float(yaper_um),
@@ -273,10 +269,7 @@ if run_button:
             separation_um=0.0,
             coherent=False,
         ),
-        boundary=BoundaryRequest(
-            use_sponge=True,
-            windowedge=0.1,
-        ),
+        boundary=BoundaryRequest(use_sponge=True, windowedge=0.1),
         solver=SolverRequest(
             static_max_steps=int(static_max_steps),
             Nt=int(Nt),
@@ -308,18 +301,38 @@ if run_button:
     with st.spinner("Running simulation..."):
         result = run_engine(request, progress_callback=gui_progress)
 
+    metadata_path = run_dir / "metadata.json"
+    metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+
+    st.session_state["last_run_dir"] = str(run_dir)
+    st.session_state["last_metadata"] = metadata
+    st.session_state["last_result"] = result
+    st.session_state["last_mode"] = selected_mode
+
     status_box.success("Simulation finished successfully.")
     progress_bar.progress(100)
     st.success("Run complete")
 
+# -------------------------
+# Persistent result display
+# -------------------------
+
+if "last_run_dir" in st.session_state:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    run_dir = Path(st.session_state["last_run_dir"])
+    metadata = st.session_state.get("last_metadata", {})
+    result = st.session_state.get("last_result", {})
+    result_mode = st.session_state.get("last_mode", selected_mode)
+
     metadata_path = run_dir / "metadata.json"
-    metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
 
     st.subheader("Run summary")
 
     if metadata:
         col1, col2, col3 = st.columns(3)
-        raw_mode = metadata.get("mode", "n/a")
+        raw_mode = metadata.get("mode", result_mode)
 
         col1.metric("Mode", display_mode_labels.get(raw_mode, raw_mode))
         col2.metric(
@@ -352,48 +365,199 @@ if run_button:
 
         iyz_path = run_dir / "Iyz.dat"
 
-        if iyz_path.exists() and metadata:
-            import matplotlib.pyplot as plt
-            import numpy as np
-
+        if iyz_path.exists() and metadata and iyz_path.stat().st_size > 0:
             Nz_meta = int(metadata["Nz"])
             Ny_meta = int(metadata["Ny"])
-            if False:
-                Nt_out = int(metadata.get("Nt_out", 1))
-            if "Nt_out" in metadata:
-                Nt_out = int(metadata["Nt_out"])
+            n_values = iyz_path.stat().st_size // 4
+            Nt_out = n_values // (Nz_meta * Ny_meta)
+
+            if Nt_out > 0:
+                Iyz = np.memmap(
+                    iyz_path,
+                    dtype=np.float32,
+                    mode="r",
+                    shape=(Nt_out, Nz_meta, Ny_meta),
+                )
+
+                final_yz = np.asarray(Iyz[-1])
+
+                z_max_um = (float(metadata["Nz"]) - 1) * float(metadata["dz_um"])
+                yaper_meta_um = float(metadata["yaper_um"])
+
+                fig, ax = plt.subplots(figsize=(9, 4))
+                im = ax.imshow(
+                    final_yz.T,
+                    aspect="auto",
+                    origin="lower",
+                    extent=[0.0, z_max_um, -0.5 * yaper_meta_um, 0.5 * yaper_meta_um],
+                )
+
+                ax.set_xlabel("z (µm)")
+                ax.set_ylabel("y (µm)")
+                ax.set_title("Final yz intensity")
+                fig.colorbar(im, ax=ax, label="I")
+
+                st.pyplot(fig)
+                plt.close(fig)
             else:
-                n_values = iyz_path.stat().st_size // 4  # float32
-                Nt_out = n_values // (Nz_meta * Ny_meta)
-            Iyz = np.memmap(
-                iyz_path,
-                dtype=np.float32,
-                mode="r",
-                shape=(Nt_out, Nz_meta, Ny_meta),
-            )
-
-            final_yz = np.asarray(Iyz[-1])
-
-            z_max_um = (float(metadata["Nz"]) - 1) * float(metadata["dz_um"])
-            yaper_meta_um = float(metadata["yaper_um"])
-
-            fig, ax = plt.subplots(figsize=(9, 4))
-            im = ax.imshow(
-                final_yz.T,
-                aspect="auto",
-                origin="lower",
-                extent=[0.0, z_max_um, -0.5 * yaper_meta_um, 0.5 * yaper_meta_um],
-            )
-
-            ax.set_xlabel("z (µm)")
-            ax.set_ylabel("y (µm)")
-            ax.set_title("Final yz intensity")
-            fig.colorbar(im, ax=ax, label="I")
-
-            st.pyplot(fig)
-            plt.close(fig)
+                st.info("Iyz.dat exists but contains no complete frames.")
         else:
             st.info("No saved Iyz.dat found for this run.")
+
+        st.subheader("Slice movie viewer")
+
+        movie_options = {
+            "Iyz": run_dir / "Iyz.dat",
+            "Ixz": run_dir / "Ixz.dat",
+            "dthetayz": run_dir / "dthetayz.dat",
+            "dthetaxz": run_dir / "dthetaxz.dat",
+        }
+
+        available_movies = {
+            name: path
+            for name, path in movie_options.items()
+            if path.exists() and path.stat().st_size > 0
+        }
+
+        if available_movies and metadata:
+            movie_name = st.selectbox(
+                "Movie slice",
+                list(available_movies.keys()),
+                key="movie_slice_selector",
+            )
+
+            movie_path = available_movies[movie_name]
+
+            Nz_meta = int(metadata["Nz"])
+            Nx_meta = int(metadata["Nx"])
+            Ny_meta = int(metadata["Ny"])
+
+            n_values = movie_path.stat().st_size // 4
+
+            if movie_name.endswith("yz"):
+                frame_shape = (Nz_meta, Ny_meta)
+                frame_size = Nz_meta * Ny_meta
+            else:
+                frame_shape = (Nz_meta, Nx_meta)
+                frame_size = Nz_meta * Nx_meta
+
+            nframes = n_values // frame_size
+       
+            if nframes <= 0:
+                st.info(f"{movie_name} exists but contains no complete frames.")
+            else:
+                frame_key = f"{movie_name}_movie_frame"
+            
+                if frame_key not in st.session_state:
+                    st.session_state[frame_key] = nframes - 1
+            
+                st.session_state[frame_key] = min(
+                    max(int(st.session_state[frame_key]), 0),
+                    int(nframes - 1),
+                )
+            
+                c1, c2, c3, c4, c5 = st.columns(5)
+            
+                with c1:
+                    if st.button("⏮ First", key=f"{movie_name}_first"):
+                        st.session_state[frame_key] = 0
+            
+                with c2:
+                    if st.button("◀ Previous", key=f"{movie_name}_prev"):
+                        st.session_state[frame_key] = max(
+                            0,
+                            int(st.session_state[frame_key]) - 1,
+                        )
+            
+                with c3:
+                    st.metric("Frame", f"{st.session_state[frame_key]} / {nframes - 1}")
+            
+                with c4:
+                    if st.button("Next ▶", key=f"{movie_name}_next"):
+                        st.session_state[frame_key] = min(
+                            int(nframes - 1),
+                            int(st.session_state[frame_key]) + 1,
+                        )
+            
+                with c5:
+                    if st.button("Last ⏭", key=f"{movie_name}_last"):
+                        st.session_state[frame_key] = int(nframes - 1)
+            
+                if nframes == 1:
+                    frame = 0
+                    st.caption("Single-frame dataset")
+                else:
+                    frame = st.slider(
+                        "Frame",
+                        min_value=0,
+                        max_value=int(nframes - 1),
+                        value=int(st.session_state[frame_key]),
+                        key=f"{movie_name}_frame_slider",
+                    )
+                    st.session_state[frame_key] = int(frame)
+            
+                frame = int(st.session_state[frame_key])
+            
+                arr = np.memmap(
+                    movie_path,
+                    dtype=np.float32,
+                    mode="r",
+                    shape=(nframes, *frame_shape),
+                )
+            
+                data = np.asarray(arr[frame])
+            
+                fig, ax = plt.subplots(figsize=(9, 4))
+                
+                if movie_name.endswith("yz"):
+                    extent = [
+                        0.0,
+                        (Nz_meta - 1) * float(metadata["dz_um"]),
+                        -0.5 * float(metadata["yaper_um"]),
+                        0.5 * float(metadata["yaper_um"]),
+                    ]
+                    ax.set_ylabel("y (µm)")
+                else:
+                    extent = [
+                        0.0,
+                        (Nz_meta - 1) * float(metadata["dz_um"]),
+                        -0.5 * float(metadata["xaper_um"]),
+                        0.5 * float(metadata["xaper_um"]),
+                    ]
+                    ax.set_ylabel("x (µm)")
+                
+                imshow_kwargs = dict(
+                    aspect="auto",
+                    origin="lower",
+                    extent=extent,
+                )
+                
+                if movie_name in {"Iyz", "Ixz"}:
+                    default_vmax = float(np.nanmax(arr))
+                    if not np.isfinite(default_vmax) or default_vmax <= 0:
+                        default_vmax = 1.0
+                
+                    I_vmax = st.number_input(
+                        f"{movie_name} fixed color max",
+                        value=default_vmax,
+                        min_value=0.0,
+                        format="%.6g",
+                        key=f"{movie_name}_vmax",
+                    )
+                
+                    imshow_kwargs["vmin"] = 0.0
+                    imshow_kwargs["vmax"] = float(I_vmax)
+                
+                im = ax.imshow(data.T, **imshow_kwargs)
+                
+                ax.set_xlabel("z (µm)")
+                ax.set_title(f"{movie_name}, frame {frame}/{nframes - 1}")
+                fig.colorbar(im, ax=ax, label=movie_name)
+                
+                st.pyplot(fig)
+                plt.close(fig)
+        else:
+            st.info("No saved slice movie files found for this run.")
 
     with diagnostics_tab:
         scalar_log = run_dir / "scalar_log.csv"
@@ -404,17 +568,17 @@ if run_button:
             st.subheader("Scalar diagnostics")
             df = pd.read_csv(scalar_log)
 
-            if selected_mode == "static":
+            if result_mode == "static":
                 st.info(
                     "Static result view: z-dependent quantities are shown along "
                     "the propagation direction."
                 )
-            elif selected_mode == "time_dependent":
+            elif result_mode == "time_dependent":
                 st.info(
                     "Time-dependent result view: scalar summaries are reduced to "
                     "a final-z time trace."
                 )
-            elif selected_mode == "time_dependent_dual_grid":
+            elif result_mode == "time_dependent_dual_grid":
                 st.info(
                     "Dual-grid TD result view: scalar summaries are reduced to a "
                     "final-z time trace; director dynamics were solved on the coarse grid."
@@ -423,7 +587,7 @@ if run_button:
             if "Imax" in df.columns:
                 st.subheader("Intensity summary")
 
-                if selected_mode == "static":
+                if result_mode == "static":
                     if "z_um" in df.columns:
                         st.caption("Static run: maximum intensity versus propagation distance.")
                         st.line_chart(df.set_index("z_um")["Imax"])
@@ -453,6 +617,8 @@ if run_button:
 
             with st.expander("Scalar log table"):
                 st.dataframe(df)
+        else:
+            st.info("No scalar_log.csv found for this run.")
 
     with files_tab:
         with st.expander("Saved simulation request"):
