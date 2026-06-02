@@ -6,7 +6,8 @@ import math
 from .backend import asnumpy, get_backend
 from .bias import compute_neff, theta_bias_2d_from_params
 from ..validated_core.runner_core import intens_into  # optional only if needed
-
+from .dual_grid import restrict_block_mean, prolong_repeat
+from .launch import intensity, make_input_field
 
 # -----------------------------------------------------------------------------
 # Parameters and context
@@ -104,39 +105,11 @@ class LegacyPlans:
     diagS: Any = None
     lamS: Any = None
 
-def intensity(amp, coherent: bool, *, xp):
-    a0, a1 = amp[0], amp[1]
-    if coherent:
-        s = a0 + a1
-        return (s.real * s.real + s.imag * s.imag).astype(xp.float32)
-    return (a0.real * a0.real + a0.imag * a0.imag + a1.real * a1.real + a1.imag * a1.imag).astype(xp.float32)
 
 
-def make_input_field(p: LCParams, x, y, xp):
-    X = x[:, None]
-    Y = y[None, :]
-    g1 = xp.exp(-(X**2) / float(p.waist_x_um) ** 2 - ((Y - 0.5 * p.y_sep_um) ** 2) / float(p.waist_y_um) ** 2)
-    if abs(float(p.y_sep_um)) > 0:
-        g2 = xp.exp(-(X**2) / float(p.waist_x_um) ** 2 - ((Y + 0.5 * p.y_sep_um) ** 2) / float(p.waist_y_um) ** 2)
-    else:
-        g2 = xp.zeros_like(g1)
-
-    amp = xp.stack([g1, g2], axis=0).astype(xp.complex64)
-    norm = xp.sum(intensity(amp, p.coherent, xp=xp)) * xp.float32((p.xaper_um / p.Nx) * (p.yaper_um / p.Ny))
-    norm = xp.where(norm == 0, xp.float32(1.0), norm)
-    return (amp / xp.sqrt(norm / xp.float32(p.power_norm))).astype(xp.complex64)
 
 
-def restrict_block_mean(arr, factor: int, *, xp):
-    Nx, Ny = arr.shape
-    f = int(factor)
-    return arr.reshape(Nx // f, f, Ny // f, f).mean(axis=(1, 3)).astype(xp.float32)
 
-
-def prolong_repeat(arr_c, factor: int, *, target_shape: Tuple[int, int], xp):
-    f = int(factor)
-    arr = xp.repeat(xp.repeat(arr_c, f, axis=0), f, axis=1)
-    return arr[: target_shape[0], : target_shape[1]].astype(xp.float32)
 
 
 def make_context(params: LCParams) -> Tuple[LCContext, Optional[DualGrid]]:

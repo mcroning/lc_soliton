@@ -358,8 +358,13 @@ if run_button:
 
             Nz_meta = int(metadata["Nz"])
             Ny_meta = int(metadata["Ny"])
-            Nt_out = int(metadata.get("Nt_out", 1))
-
+            if False:
+                Nt_out = int(metadata.get("Nt_out", 1))
+            if "Nt_out" in metadata:
+                Nt_out = int(metadata["Nt_out"])
+            else:
+                n_values = iyz_path.stat().st_size // 4  # float32
+                Nt_out = n_values // (Nz_meta * Ny_meta)
             Iyz = np.memmap(
                 iyz_path,
                 dtype=np.float32,

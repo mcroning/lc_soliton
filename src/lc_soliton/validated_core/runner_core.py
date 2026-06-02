@@ -1325,27 +1325,6 @@ def run_unified_td_static(
     if static_mode not in ("linear", "strict_relax"):
         raise ValueError("static_mode must be 'linear', or 'strict_relax'")
 
-    if timedep:
-        if time_steps is None:
-            raise ValueError("timedep=True requires time_steps")
-        if tsteps is None:
-            tsteps = len(time_steps)
-    else:
-        tsteps = 1
-    t_model = 0.0
-    if timedep and restart_theta:
-        if use_dual_grid:
-            ctx_t.theta_full[...] = ctx_t.theta_bias_2d[None, :, :]
-    else:
-        ctx.theta_full[...] = ctx.theta_bias_2d[None, :, :]
-    if (not timedep) and restart_static_from_bias:
-        ctx.theta_full[...] = ctx.theta_bias_2d[None, :, :]
-
-    if (ctx.theta_z_stride_um is None) or (float(ctx.theta_z_stride_um) <= 0.0):
-        theta_k_stride = 1
-    else:
-        theta_k_stride = max(1, int(round(float(ctx.theta_z_stride_um) / float(ctx.dz))))
-
     use_dual_grid = bool(getattr(ctx, "use_dual_grid", False))
 
     if use_dual_grid:
@@ -1359,6 +1338,29 @@ def run_unified_td_static(
     else:
         ctx_t = ctx
         dg = None
+
+    if timedep:
+        if time_steps is None:
+            raise ValueError("timedep=True requires time_steps")
+        if tsteps is None:
+            tsteps = len(time_steps)
+    else:
+        tsteps = 1
+
+    t_model = 0.0
+
+    if timedep and restart_theta:
+        if use_dual_grid:
+            ctx_t.theta_full[...] = ctx_t.theta_bias_2d[None, :, :]
+        else:
+            ctx.theta_full[...] = ctx.theta_bias_2d[None, :, :]
+    elif (not timedep) and restart_static_from_bias:
+        ctx.theta_full[...] = ctx.theta_bias_2d[None, :, :]
+
+    if (ctx.theta_z_stride_um is None) or (float(ctx.theta_z_stride_um) <= 0.0):
+        theta_k_stride = 1
+    else:
+        theta_k_stride = max(1, int(round(float(ctx.theta_z_stride_um) / float(ctx.dz))))
 
 
     Nsub, dz_sub, phi_est = choose_optics_substeps(

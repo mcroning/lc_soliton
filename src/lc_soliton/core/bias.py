@@ -92,7 +92,7 @@ def theta_bias_1d_relax_bc(Nx, b, theta_bc, xp, *, max_iter=200000, tol=1e-8):
     return xp.asarray(theta.astype(np.float32), dtype=xp.float32)
 
 
-def theta_bias_2d_from_params(params: LCParams, xp):
+def theta_bias_2d_from_params(params, xp):
     if abs(float(params.theta_bc)) < 1e-14:
         th1 = theta_bias_1d_exact_zero_bc(params.Nx, params.b, xp)
     else:
