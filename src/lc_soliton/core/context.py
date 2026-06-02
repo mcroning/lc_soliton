@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 import math
 from .backend import asnumpy, get_backend
-from .bias import compute_neff, theta_bias_2d_from_params
+from ..physics.lc.bias import compute_neff, theta_bias_2d_from_params
 from ..validated_core.runner_core import intens_into  # optional only if needed
 from .dual_grid import restrict_block_mean, prolong_repeat
 from .launch import intensity, make_input_field
