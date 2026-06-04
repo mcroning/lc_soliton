@@ -44,6 +44,12 @@ def request_to_lcparams_kwargs(request):
         "waist_x_um": waist_x_um,
         "waist_y_um": waist_y_um,
         "y_sep_um": request.launch.separation_um,
+        "pair_angle_deg": request.launch.pair_angle_deg,
+        "theta_out1_deg": request.launch.theta_out1_deg,
+        "theta_out2_deg": request.launch.theta_out2_deg,
+        "phi1_deg": request.launch.phi1_deg,
+        "phi2_deg": request.launch.phi2_deg,
+        "power_ratio": request.launch.power_ratio,
         "coherent": request.launch.coherent,
 
         
@@ -126,6 +132,12 @@ def legacy_params_to_request_dict(data: dict) -> dict:
         "waist_x_um",
         "waist_y_um",
         "separation_um",
+        "pair_angle_deg",
+        "theta_out1_deg",
+        "theta_out2_deg",
+        "phi1_deg",
+        "phi2_deg",
+        "power_ratio",
         "coherent",
     ):
         if k in params:

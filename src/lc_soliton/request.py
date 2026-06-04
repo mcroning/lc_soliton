@@ -53,7 +53,12 @@ class LaunchRequest:
     waist_y_um: float | None = None
     separation_um: float = 0.0
     coherent: bool = False
-
+    pair_angle_deg: float = 0.0
+    theta_out1_deg: float = 0.0
+    theta_out2_deg: float = 0.0
+    phi1_deg: float = 0.0
+    phi2_deg: float = 0.0
+    power_ratio: float = 0.0
 @dataclass
 class BoundaryRequest:
     use_sponge: bool = True

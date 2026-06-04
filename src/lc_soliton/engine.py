@@ -80,7 +80,7 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
         run_engine(SimulationRequest(...))
     """
 
-
+    should_stop = kwargs.pop("should_stop", None)
 
     if isinstance(mode_or_request, SimulationRequest):
         request = mode_or_request
@@ -112,6 +112,7 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
                 if progress_callback is not None
                 else print if request.runtime.progress else None
             ),
+            should_stop=should_stop
         )
 
         save_request(

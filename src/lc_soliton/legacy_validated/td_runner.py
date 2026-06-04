@@ -9,7 +9,7 @@ from ..core.context import LCContext, LCParams, DualGrid
 from ..core.storage import LightStore
 from ..core.launch import intensity
 from ..core.dual_grid import restrict_block_mean, prolong_repeat
-
+from .runner_utils import residual_quality_info
 from ..validated_core.runner_core import (
     hop_linear as core_hop_linear,
     intens_into,
@@ -43,14 +43,7 @@ def _make_scalar_info_from_residual(theta, I_mid, ctx) -> dict:
         dv=ctx.dv,
         mobility=ctx.mobility,
     )
-    stats = residual_stats_2d(R)
-    return normalize_info(
-        dict(
-            rrms=stats["rms_interior"],
-            rmax=stats["max_interior"],
-            converged=True,
-        )
-    )
+    return residual_quality_info(theta, I_mid, ctx, R)
 
 
 def _run_td_predictor(

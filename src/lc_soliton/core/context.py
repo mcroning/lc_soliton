@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 import math
 from .backend import asnumpy, get_backend
-from ..physics.lc.bias import compute_neff, theta_bias_2d_from_params
+from ..physics.lc.bias import compute_neff
 from ..validated_core.runner_core import intens_into  # optional only if needed
 from .dual_grid import restrict_block_mean, prolong_repeat
 from .launch import intensity, make_input_field
+from lc_soliton.physics.lc.bias import build_theta_bias_2d_from_params
 
 # -----------------------------------------------------------------------------
 # Parameters and context
@@ -36,6 +37,15 @@ class LCParams:
     theta_clamp_min: float = -1.2
     theta_clamp_max: float = 1.2
     theta_z_gamma: float = 0.0
+    theta_bias_tol_rms: float = 5e-3
+    theta_bias_tol_max: float = 2e-2
+    theta_bias_max_iter: int = 2000
+    theta_bias_report_every: int = 1000
+    theta_bias_verbose: bool = False
+    V_bias: float = 1.0
+    P_mW: float = 1.0
+    K: float = 7e-12
+    De: float = 13.0
 
     # optical input
     power_norm: float = 1.0
@@ -43,6 +53,12 @@ class LCParams:
     waist_y_um: float = 8.0
     y_sep_um: float = 0.0
     coherent: bool = True
+    pair_angle_deg: float = 0.0
+    theta_out1_deg: float = 0.0
+    theta_out2_deg: float = 0.0
+    phi1_deg: float = 0.0
+    phi2_deg: float = 0.0
+    power_ratio: float = 0.0
 
     # stepping controls
     dz_opt_max_phi: float = 0.30
@@ -105,13 +121,6 @@ class LegacyPlans:
     diagS: Any = None
     lamS: Any = None
 
-
-
-
-
-
-
-
 def make_context(params: LCParams) -> Tuple[LCContext, Optional[DualGrid]]:
     xp, _ = get_backend(params.backend)
     Nx, Ny, Nz = int(params.Nx), int(params.Ny), int(params.Nz)
@@ -122,8 +131,13 @@ def make_context(params: LCParams) -> Tuple[LCContext, Optional[DualGrid]]:
     x = (xp.arange(Nx, dtype=xp.float32) - Nx / 2) * dx + 0.5 * dx
     y = (xp.arange(Ny, dtype=xp.float32) - Ny / 2) * dy + 0.5 * dy
 
-    theta_bias_2d = theta_bias_2d_from_params(params, xp)
-    refin = float(asnumpy(compute_neff(theta_bias_2d, ne=params.ne, no=params.no, xp=xp)).mean())
+    theta_bias_2d = build_theta_bias_2d_from_params(params, xp)
+    refin = float(
+        asnumpy(
+            compute_neff(theta_bias_2d, ne=params.ne, no=params.no, xp=xp)
+        ).mean()
+    )
+    
     kout = float(2.0 * math.pi / params.wavelength_um)
 
     fx = xp.fft.fftfreq(Nx, d=dx).astype(xp.float32)

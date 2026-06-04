@@ -21,6 +21,7 @@ def run_td(
     save_slices: bool = True,
     save_full: bool = False,
     progress: Callable[[str], None] | None = print,
+    should_stop: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """
     Run a validated time-dependent LC propagation calculation.
@@ -37,6 +38,7 @@ def run_td(
         save_slices=save_slices,
         save_full=save_full,
         progress=progress,
+        should_stop=should_stop,
     )
 
     write_environment_json(run_dir)

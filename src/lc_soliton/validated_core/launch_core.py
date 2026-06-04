@@ -36,6 +36,8 @@ except Exception:  # pragma: no cover
 
 j = 1j
 
+
+
 def genrot(rlen, thout, phi, x, y, *, refin, z_focus=0.0):
     x = cp.asarray(x)
     y = cp.asarray(y)
@@ -219,6 +221,13 @@ def build_theta_bias_IC_dirichlet_value(
     return_2d=False,
     dtype=cp.float32,
 ):
+
+    def prepare_ie_ky_operator(*, dt, mobility, du, dv, Ny):
+        a_ie = float(dt) / float(mobility)
+        lam_y = _lam_y_periodic_second_diff(Ny, dv, xp=cp).astype(cp.float32, copy=False)
+        off = cp.float32((-a_ie) * (1.0 / (du * du)))
+        diag = (1.0 + (2.0 * a_ie) * (1.0 / (du * du)) - a_ie * lam_y).astype(cp.float32, copy=False)
+        return cp.float32(a_ie), off, diag, lam_y
     theta_bc = float(theta_bc)
 
     if du is None:

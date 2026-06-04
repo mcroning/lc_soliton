@@ -10,13 +10,16 @@ from ..validated_core.runner_core import (
     hop_linear as core_hop_linear,
     prepare_cn_ky_operator,
     strict_static_relax_slice_selfconsistent,
+    lc_residual64,
 )
 
 from .runner_utils import (
     normalize_info,
     _prepare_substeps,
     _prepare_legacy_plans,
+    residual_quality_info,
 )
+
 
 def _run_static(
     *,
@@ -86,6 +89,18 @@ def _run_static(
         info = normalize_info(info)
     
         ctx.theta_full[k] = theta
+
+        R = lc_residual64(
+            theta,
+            I_mid,
+            b=ctx.b,
+            bi=ctx.bi,
+            du=ctx.du,
+            dv=ctx.dv,
+            mobility=ctx.mobility,
+        )
+        info.update(residual_quality_info(theta, I_mid, ctx, R))
+        
         store.save(0, k, I_mid, theta, info)
     
         if progress and (

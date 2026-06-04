@@ -40,6 +40,13 @@ j = 1j
 
 from .launch_core import build_theta_bias_IC, build_theta_bias_IC_dirichlet_value, compute_n_bg_from_bias, genrot, build_amp_pair
 
+def prepare_ie_ky_operator(*, dt, mobility, du, dv, Ny):
+    a_ie = float(dt) / float(mobility)
+    lam_y = _lam_y_periodic_second_diff(Ny, dv, xp=cp).astype(cp.float32, copy=False)
+    off = cp.float32((-a_ie) * (1.0 / (du * du)))
+    diag = (1.0 + (2.0 * a_ie) * (1.0 / (du * du)) - a_ie * lam_y).astype(cp.float32, copy=False)
+    return cp.float32(a_ie), off, diag, lam_y
+
 def intens(amp, coh, out=None):
     xp = cp.get_array_module(amp)
     a, b = amp[0], amp[1]
@@ -544,17 +551,12 @@ def enforce_theta_constraints(theta, theta_clamp):
     cp.ndarray
         Constrained theta field.
     """
-    def enforce_theta_constraints(theta, theta_clamp):
-        if theta_clamp is not None:
-            theta = cp.clip(
-                theta,
-                cp.float32(theta_clamp[0]),
-                cp.float32(theta_clamp[1]),
-            )
-
-        theta_bc = cp.float32(getattr(ctx, "theta_bc", 0.0))
-        theta[0, :] = theta_bc
-        theta[-1, :] = theta_bc
+    if theta_clamp is not None:
+        theta = cp.clip(
+            theta,
+            cp.float32(theta_clamp[0]),
+            cp.float32(theta_clamp[1]),
+        )
     return theta
 
 def _get_inv_dz2(ctx):
@@ -633,7 +635,7 @@ def _get_cn_ky_operator_cached(ctx, dt):
     return out
 
 def _cn_solve_dirichletx_periody(rhs, *, off, diag, theta_bc=0.0):
-    theta_bc = cp.float32(theta_bc)
+    theta_bc = cp.asarray(theta_bc, dtype=cp.float32)
 
     rhs2 = rhs.astype(cp.float32, copy=True)
     rhs2[0, :] = theta_bc
@@ -673,9 +675,13 @@ def advance_theta_timestep_cn_fft_thomas_prepared(
     drive_n = alpha * cp.sin(2.0 * theta_n)
 
     rhs = theta_n + s * lap_n + cp.float32(float(dt) / float(mobility)) * drive_n
-    rhs[0, :] = 0.0
-    rhs[-1, :] = 0.0
-    return _cn_solve_dirichletx_periody(rhs, off=off, diag=diag)
+    theta_bc = theta_n[0, 0].astype(cp.float32)
+    rhs[0, :] = theta_bc
+    rhs[-1, :] = theta_bc
+    return _cn_solve_dirichletx_periody(rhs, off=off, diag=diag, theta_bc=theta_bc)    
+#    rhs[0, :] = 0.0
+#    rhs[-1, :] = 0.0
+#    return _cn_solve_dirichletx_periody(rhs, off=off, diag=diag)
 
 def advance_theta_timestep_cn_trap_picard_prepared(
     theta_n, *, dt, b, bi, I_n, I_pic,
@@ -700,8 +706,9 @@ def advance_theta_timestep_cn_trap_picard_prepared(
     N_n = alpha_old * cp.sin(2.0 * theta_n)
 
     rhs_base = theta_n + s * lap_n + half_dt_over_m * N_n
-    rhs_base[0, :] = 0.0
-    rhs_base[-1, :] = 0.0
+    theta_bc = theta_n[0, 0].astype(cp.float32)
+    rhs_base[0, :] = theta_bc
+    rhs_base[-1, :] = theta_bc
 
     theta_g = advance_theta_timestep_cn_fft_thomas_prepared(
         theta_n,
@@ -714,10 +721,16 @@ def advance_theta_timestep_cn_trap_picard_prepared(
         N_g = alpha_pic * cp.sin(2.0 * theta_g)
 
         rhs = rhs_base + half_dt_over_m * N_g
-        rhs[0, :] = 0.0
-        rhs[-1, :] = 0.0
+        rhs[0, :] = theta_bc
+        rhs[-1, :] = theta_bc
 
-        theta_new = _cn_solve_dirichletx_periody(rhs, off=off, diag=diag)
+#        theta_new = _cn_solve_dirichletx_periody(rhs, off=off, diag=diag)
+        theta_new = _cn_solve_dirichletx_periody(
+            rhs,
+            off=off,
+            diag=diag,
+            theta_bc=theta_bc,
+        )
         theta_new = enforce_theta_constraints(theta_new, clamp)
 
         dth = theta_new - theta_g
@@ -748,12 +761,30 @@ def advance_theta_physical_timestep_semiimplicit_zcoupled(
     gam = cp.float32(gamma_z) * inv_dz2
     dt_over_m = cp.float32(float(dt) / float(mobility))
 
-    rhs = theta_n + dt_over_m * (drive_n + gam * (tp + tn))
-    rhs[0, :] = 0.0
-    rhs[-1, :] = 0.0
+#    rhs = theta_n + dt_over_m * (drive_n + gam * (tp + tn))
+#    
+#    rhs[0, :] = 0.0
+#    rhs[-1, :] = 0.0
 
+#    diag_eff = diag + cp.float32(2.0) * dt_over_m * gam#
+#    theta_np1 = _cn_solve_dirichletx_periody(rhs, off=off, diag=diag_eff)
+
+    rhs = theta_n + dt_over_m * (drive_n + gam * (tp + tn))
+
+    theta_bc = theta_n[0, 0].astype(cp.float32)
+    
+    rhs[0, :] = theta_bc
+    rhs[-1, :] = theta_bc
+    
     diag_eff = diag + cp.float32(2.0) * dt_over_m * gam
-    theta_np1 = _cn_solve_dirichletx_periody(rhs, off=off, diag=diag_eff)
+    
+    theta_np1 = _cn_solve_dirichletx_periody(
+        rhs,
+        off=off,
+        diag=diag_eff,
+        theta_bc=theta_bc,
+    )
+    
     return enforce_theta_constraints(theta_np1, clamp)
 
 def advance_theta_timestep_cn_fft_thomas_prepared_zcoupled(
@@ -776,11 +807,21 @@ def advance_theta_timestep_cn_fft_thomas_prepared_zcoupled(
     dt_over_m = cp.float32(float(dt) / float(mobility))
 
     rhs = theta_n + s * lap_n + dt_over_m * (drive_n + gam * (tp + tn))
-    rhs[0, :] = 0.0
-    rhs[-1, :] = 0.0
+
+    theta_bc = theta_n[0, 0].astype(cp.float32)
+    rhs[0, :] = theta_bc
+    rhs[-1, :] = theta_bc
 
     diag_eff = diag + cp.float32(2.0) * dt_over_m * gam
-    return _cn_solve_dirichletx_periody(rhs, off=off, diag=diag_eff)
+
+    theta_np1 = _cn_solve_dirichletx_periody(
+        rhs,
+        off=off,
+        diag=diag_eff,
+        theta_bc=theta_bc,
+    )
+
+    return theta_np1
 
 def advance_theta_timestep_cn_trap_picard_prepared_zcoupled(
     theta_n, *, dt, b, bi, Ixy,
@@ -808,8 +849,11 @@ def advance_theta_timestep_cn_trap_picard_prepared_zcoupled(
         + cp.float32(0.5) * dt_over_m * N_n
         + dt_over_m * gam * (tp + tn)
     )
-    rhs_base[0, :] = 0.0
-    rhs_base[-1, :] = 0.0
+    #rhs_base[0, :] = 0.0
+    #rhs_base[-1, :] = 0.0
+    theta_bc = theta_n[0, 0].astype(cp.float32)
+    rhs_base[0, :] = theta_bc
+    rhs_base[-1, :] = theta_bc
 
     diag_eff = diag + cp.float32(2.0) * dt_over_m * gam
 
@@ -825,10 +869,16 @@ def advance_theta_timestep_cn_trap_picard_prepared_zcoupled(
     for _ in range(int(max_iter)):
         N_g = alpha * cp.sin(2.0 * theta_g)
         rhs = rhs_base + cp.float32(0.5) * dt_over_m * N_g
-        rhs[0, :] = 0.0
-        rhs[-1, :] = 0.0
+        rhs[0, :] = theta_bc
+        rhs[-1, :] = theta_bc
 
-        theta_new = _cn_solve_dirichletx_periody(rhs, off=off, diag=diag_eff)
+        #theta_new = _cn_solve_dirichletx_periody(rhs, off=off, diag=diag_eff)
+        theta_new = _cn_solve_dirichletx_periody(
+            rhs,
+            off=off,
+            diag=diag_eff,
+            theta_bc=theta_bc,
+        )
         theta_new = enforce_theta_constraints(theta_new, clamp)
 
         dth = theta_new - theta_g
