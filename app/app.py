@@ -306,6 +306,27 @@ if run_button:
     progress_bar.progress(0)
     status_box.info(f"Launching {selected_mode_label} simulation...")
 
+
+    # Recompute from live GUI values immediately before request construction
+    
+    V_F = float(reported_freedericksz_voltage(K=float(K_SI), De=float(De_rel)))
+    b_live = (3.141592653589793**2 / 8.0) * (float(V_bias) / V_F)**2
+
+    bi_live = float(compute_bi_from_power(
+        float(P_mW),
+        d_um=float(xaper_um),
+        K=float(K_SI),
+        ne=float(ne),
+        no=float(no),
+    ))
+    
+    b_run = float(b_override) if use_b_override else b_live
+    bi_run = float(bi_override) if use_bi_override else bi_live
+
+
+
+
+    
     request = SimulationRequest(
         mode=selected_mode,
         grid=GridRequest(Nx=int(Nx), Ny=int(Ny), Nz=int(Nz)),
@@ -315,18 +336,20 @@ if run_button:
             dz_um=float(dz_um),
             wavelength_um=0.633,
         ),
-        material=MaterialRequest(
-            ne=float(ne),
-            no=float(no),
-            b=float(b),
-            bi=float(bi),
-            mobility=1.0,
-            theta_bc=float(theta_bc),
-            theta_bias_amp=0.1,
-            theta_clamp_min=-1.2,
-            theta_clamp_max=1.2,
-            theta_z_gamma=0.0,
-        ),
+    material=MaterialRequest(
+        ne=float(ne),
+        no=float(no),
+        b=float(b_run),
+        bi=float(bi_run),
+        mobility=1.0,
+        theta_bc=float(theta_bc),
+        theta_bias_amp=0.1,
+        theta_clamp_min=-1.2,
+        theta_clamp_max=1.2,
+        theta_z_gamma=0.0,
+        K=float(K_SI),
+        De=float(De_rel),
+    ),
         launch=LaunchRequest(
             power_mW=float(P_mW),
             waist_x_um=float(waist_x_um),
@@ -385,6 +408,20 @@ if run_button:
     finally:
         metadata_path = run_dir / "metadata.json"
         metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+        
+        if metadata_path.exists():
+            metadata.update({
+                "V_bias": float(V_bias),
+                "P_mW": float(P_mW),
+                "K": float(K_SI),
+                "De": float(De_rel),
+                "b": float(b_run),
+                "bi": float(bi_run),
+                "use_sponge": True,
+                "windowedge": 0.1,
+            })
+            metadata_path.write_text(json.dumps(metadata, indent=2))
+        
         st.session_state["last_metadata"] = metadata
 
 

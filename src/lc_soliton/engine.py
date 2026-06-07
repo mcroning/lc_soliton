@@ -30,7 +30,6 @@ ENGINE_MODE_DESCRIPTIONS = {
 }
 
 
-
 def describe_engine_modes() -> dict[str, str]:
     """
     Return public engine mode descriptions.
@@ -57,7 +56,7 @@ def _add_request_metadata(run_dir: str | Path) -> None:
         "package_version": __version__,
         "translation_version": REQUEST_TRANSLATION_VERSION,
     }
-
+    
     path.write_text(json.dumps(metadata, indent=2))
 
 def available_engine_modes(include_experimental: bool = False):
@@ -119,7 +118,7 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
             request,
             Path(request.output.run_dir) / "request.json",
         )
-
+       
         if mode == "static":
             result = run_static(params, **common_kwargs)
             _add_request_metadata(request.output.run_dir)

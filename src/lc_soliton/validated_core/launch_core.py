@@ -37,7 +37,6 @@ except Exception:  # pragma: no cover
 j = 1j
 
 
-
 def genrot(rlen, thout, phi, x, y, *, refin, z_focus=0.0):
     x = cp.asarray(x)
     y = cp.asarray(y)
@@ -204,7 +203,111 @@ def build_theta_bias_IC(
         return theta_2d
     return xp.repeat(theta_2d[:, :, None], Nz, axis=2)
 
+
 def build_theta_bias_IC_dirichlet_value(
+    Nx, Ny, Nz, b,
+    *,
+    theta_bc=0.0,
+    eps_clip=1e-12,
+    return_1d=False,
+    return_2d=False,
+    dtype=cp.float32,
+):
+  
+    xp = cp
+
+    u = xp.linspace(-1.0, 1.0, Nx, dtype=cp.float64)
+    two_b = 2.0 * float(b)
+
+    sbc = float(np.sin(theta_bc))
+
+    # ---------------------------------------
+    # solve for modulus m
+    # ---------------------------------------
+
+    if abs(theta_bc) < 1e-14:
+
+        def f(m):
+            Km = spspec.ellipk(m)
+            return Km * Km - two_b
+
+    else:
+
+        sqrt2b = np.sqrt(two_b)
+
+        def f(m):
+            sn, cn, dn, ph = spspec.ellipj(sqrt2b, m)
+            cd = cn / dn
+            return np.sqrt(m) * cd - sbc
+
+    m_lo = 1e-12
+    m_hi = 1.0 - 1e-12
+
+    flo = f(m_lo)
+    fhi = f(m_hi)
+
+    if flo * fhi > 0:
+        raise RuntimeError(
+            f"Could not bracket bias modulus: "
+            f"f({m_lo})={flo}, f({m_hi})={fhi}"
+        )
+
+    for _ in range(80):
+        m_mid = 0.5 * (m_lo + m_hi)
+
+        if f(m_lo) * f(m_mid) <= 0:
+            m_hi = m_mid
+        else:
+            m_lo = m_mid
+
+        if abs(m_hi - m_lo) < 1e-14:
+            break
+
+    m = 0.5 * (m_lo + m_hi)
+
+    # ---------------------------------------
+    # evaluate profile
+    # ---------------------------------------
+
+    theta0 = xp.arcsin(xp.sqrt(m))
+
+    arg = xp.sqrt(two_b) * u
+
+    arg_cpu = cp.asnumpy(arg)
+
+    _, cn_cpu, dn_cpu, _ = spspec.ellipj(arg_cpu, float(m))
+
+    cn = xp.asarray(cn_cpu)
+    dn = xp.asarray(dn_cpu)
+
+    cd = cn / dn
+
+    s = xp.sin(theta0) * cd
+
+    s = xp.clip(
+        s,
+        -1.0 + eps_clip,
+        1.0 - eps_clip,
+    )
+
+    theta_1d = xp.arcsin(s).astype(dtype, copy=False)
+
+    if return_1d:
+        return theta_1d
+
+    theta_2d = xp.tile(theta_1d[:, None], (1, Ny)).astype(dtype, copy=False)
+
+    theta_2d[0, :] = cp.float32(theta_bc)
+    theta_2d[-1, :] = cp.float32(theta_bc)
+
+    if return_2d:
+        return theta_2d
+
+    return xp.repeat(theta_2d[:, :, None], Nz, axis=2)
+
+
+    
+def build_theta_bias_IC_dirichlet_value_original(
     Nx, Ny, Nz, b,
     *,
     theta_bc=0.0,
@@ -222,6 +325,68 @@ def build_theta_bias_IC_dirichlet_value(
     dtype=cp.float32,
 ):
 
+
+# Fast y-uniform bias path
+    if False:
+        theta_x = cp.full((Nx,), cp.float32(theta_bc), dtype=cp.float32)
+        theta_x[0] = cp.float32(theta_bc)
+        theta_x[-1] = cp.float32(theta_bc)
+    
+        a_ie = cp.float32(float(dtau) / float(mobility))
+        off = cp.float32((-a_ie) / (du * du))
+        diag = cp.full(
+            (Nx - 2,),
+            cp.float32(1.0 + 2.0 * float(a_ie) / (du * du)),
+            dtype=cp.float32,
+        )
+    
+        last_stats = None
+    
+        for it in range(int(max_iter)):
+            drive = cp.float32(b) * cp.sin(2.0 * theta_x)
+            rhs = theta_x + a_ie * drive
+    
+            d = rhs[1:-1].astype(cp.float32, copy=True)
+            d[0]  -= off * cp.float32(theta_bc)
+            d[-1] -= off * cp.float32(theta_bc)
+    
+            theta_inner = thomas_const_tridiag_1d(off, diag, off, d)
+    
+            theta_x[1:-1] = theta_inner
+            theta_x[0] = cp.float32(theta_bc)
+            theta_x[-1] = cp.float32(theta_bc)
+    
+            if (it % report_every == 0) or (it == max_iter - 1):
+                lap = (theta_x[2:] - 2.0 * theta_x[1:-1] + theta_x[:-2]) / cp.float32(du * du)
+                Rint = lap + cp.float32(b) * cp.sin(2.0 * theta_x[1:-1])
+    
+                stats = {
+                    "max_interior": float(cp.max(cp.abs(Rint))),
+                    "rms_interior": float(cp.sqrt(cp.mean(Rint.astype(cp.float64) ** 2))),
+                }
+                last_stats = stats
+    
+                if verbose:
+                    print(
+                        f"[bias-1d theta_bc={theta_bc:.4g}] it={it:6d} "
+                        f"Rmax={stats['max_interior']:.3e} "
+                        f"Rrms={stats['rms_interior']:.3e}"
+                    )
+    
+                if stats["rms_interior"] < tol_rms and stats["max_interior"] < tol_max:
+                    break
+    
+        if return_1d:
+            return theta_x.astype(dtype, copy=False)
+    
+        theta_2d = cp.repeat(theta_x[:, None], int(Ny), axis=1)
+    
+        if return_2d:
+            return theta_2d.astype(dtype, copy=False)
+    
+        return cp.repeat(theta_2d[:, :, None], int(Nz), axis=2).astype(dtype, copy=False)
+    
+    
     def prepare_ie_ky_operator(*, dt, mobility, du, dv, Ny):
         a_ie = float(dt) / float(mobility)
         lam_y = _lam_y_periodic_second_diff(Ny, dv, xp=cp).astype(cp.float32, copy=False)

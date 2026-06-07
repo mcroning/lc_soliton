@@ -281,7 +281,6 @@ def build_theta_bias_IC(
         return theta_2d
     return xp.repeat(theta_2d[:, :, None], Nz, axis=2)
 
-
 def build_theta_bias_IC_dirichlet_value(
     Nx, Ny, Nz, b,
     *,
@@ -289,99 +288,119 @@ def build_theta_bias_IC_dirichlet_value(
     du=None,
     dv=None,
     mobility=1.0,
-    max_iter=2000,
-    tol_rms=5e-3,
-    tol_max=2e-2,
-    dtau=0.05,
-    report_every=1000,
+    max_iter=None,
+    tol_rms=None,
+    tol_max=None,
+    dtau=None,
+    report_every=None,
     verbose=False,
+    eps_clip=1e-12,
     return_1d=False,
     return_2d=False,
     dtype=cp.float32,
 ):
-    theta_bc = float(theta_bc)
+    xp = cp
+    if abs(float(theta_bc)) < 1e-14:
+        return build_theta_bias_IC(
+            Nx, Ny, Nz, b,
+            eps_clip=eps_clip,
+            return_1d=return_1d,
+            return_2d=return_2d,
+            dtype=dtype,
+            kick_eps=0.0,
+        )
+    xp = cp
 
-    if du is None:
-        du = 2.0 / (Nx - 1)
-    if dv is None:
-        dv = 1.0
+    u = xp.linspace(-1.0, 1.0, Nx, dtype=cp.float64)
+    two_b = 2.0 * float(b)
 
-    theta = cp.full((Nx, Ny), cp.float32(theta_bc), dtype=cp.float32)
-    theta[0, :] = cp.float32(theta_bc)
-    theta[-1, :] = cp.float32(theta_bc)
+    sbc = float(np.sin(theta_bc))
 
-    _, off, diag, _ = prepare_ie_ky_operator(
-        dt=float(dtau),
-        mobility=float(mobility),
-        du=float(du),
-        dv=float(dv),
-        Ny=int(Ny),
+    # ---------------------------------------
+    # solve for modulus m
+    # ---------------------------------------
+
+    if abs(theta_bc) < 1e-14:
+
+        def f(m):
+            Km = spspec.ellipk(m)
+            return Km * Km - two_b
+
+    else:
+
+        sqrt2b = np.sqrt(two_b)
+
+        def f(m):
+            sn, cn, dn, ph = spspec.ellipj(sqrt2b, m)
+            cd = cn / dn
+            return np.sqrt(m) * cd - sbc
+
+    m_lo = 1e-12
+    m_hi = 1.0 - 1e-12
+
+    flo = f(m_lo)
+    fhi = f(m_hi)
+
+    if flo * fhi > 0:
+        raise RuntimeError(
+            f"Could not bracket bias modulus: "
+            f"f({m_lo})={flo}, f({m_hi})={fhi}"
+        )
+
+    for _ in range(80):
+        m_mid = 0.5 * (m_lo + m_hi)
+
+        if f(m_lo) * f(m_mid) <= 0:
+            m_hi = m_mid
+        else:
+            m_lo = m_mid
+
+        if abs(m_hi - m_lo) < 1e-14:
+            break
+
+    m = 0.5 * (m_lo + m_hi)
+
+    # ---------------------------------------
+    # evaluate profile
+    # ---------------------------------------
+
+    theta0 = xp.arcsin(xp.sqrt(m))
+
+    arg = xp.sqrt(two_b) * u
+
+    arg_cpu = cp.asnumpy(arg)
+
+    _, cn_cpu, dn_cpu, _ = spspec.ellipj(arg_cpu, float(m))
+
+    cn = xp.asarray(cn_cpu)
+    dn = xp.asarray(dn_cpu)
+
+    cd = cn / dn
+
+    s = xp.sin(theta0) * cd
+
+    s = xp.clip(
+        s,
+        -1.0 + eps_clip,
+        1.0 - eps_clip,
     )
 
-    bc_hat = cp.fft.fft(
-        cp.full((Ny,), cp.float32(theta_bc), dtype=cp.float32)
-    ).astype(cp.complex64)
-
-    def solve_ie(rhs):
-        rhs2 = rhs.astype(cp.float32, copy=True)
-        rhs2[0, :] = 0.0
-        rhs2[-1, :] = 0.0
-
-        rhs_hat = cp.fft.fft(rhs2, axis=1).astype(cp.complex64, copy=False)
-        d_hatB = rhs_hat[1:-1, :].T.copy(order="C")
-
-        d_hatB[:, 0] -= off * bc_hat
-        d_hatB[:, -1] -= off * bc_hat
-
-        x_hatB = thomas_batched_const_tridiag(off, diag, off, d_hatB)
-
-        theta_hat = cp.zeros_like(rhs_hat)
-        theta_hat[1:-1, :] = x_hatB.T
-
-        out = cp.fft.ifft(theta_hat, axis=1).real.astype(cp.float32, copy=False)
-        out[0, :] = cp.float32(theta_bc)
-        out[-1, :] = cp.float32(theta_bc)
-        return out
-
-    I0 = cp.zeros((Nx, Ny), dtype=cp.float32)
-
-    for it in range(int(max_iter)):
-        drive = cp.float32(b) * cp.sin(2.0 * theta)
-        rhs = theta + cp.float32(float(dtau) / float(mobility)) * drive
-        theta = solve_ie(rhs)
-
-        if (it % int(report_every) == 0) or (it == max_iter - 1):
-            R = lc_residual2d_dirichletx_periody(
-                theta,
-                I0,
-                b=float(b),
-                bi=0.0,
-                du=float(du),
-                dv=float(dv),
-                mobility=float(mobility),
-            )
-            Rint = R[1:-1, :].astype(cp.float64, copy=False)
-            rmax = float(cp.max(cp.abs(Rint)))
-            rrms = float(cp.sqrt(cp.mean(Rint * Rint)))
-
-            if verbose:
-                print(
-                    f"[bias theta_bc={theta_bc:.4g}] it={it:6d} "
-                    f"Rmax={rmax:.3e} Rrms={rrms:.3e}"
-                )
-
-            if rrms < float(tol_rms) and rmax < float(tol_max):
-                break
-
-    theta[0, :] = cp.float32(theta_bc)
-    theta[-1, :] = cp.float32(theta_bc)
+    theta_1d = xp.arcsin(s).astype(dtype, copy=False)
 
     if return_1d:
-        return theta[:, 0].astype(dtype, copy=False)
-    if return_2d:
-        return theta.astype(dtype, copy=False)
+        return theta_1d
 
-    return cp.repeat(theta[:, :, None], int(Nz), axis=2).astype(dtype, copy=False)
+    theta_2d = xp.tile(theta_1d[:, None], (1, Ny)).astype(dtype, copy=False)
+
+    theta_2d[0, :] = cp.float32(theta_bc)
+    theta_2d[-1, :] = cp.float32(theta_bc)
+
+    if return_2d:
+        return theta_2d
+
+    return xp.repeat(theta_2d[:, :, None], Nz, axis=2)
+
+
 
 
 def build_theta_bias_2d_from_physical(
