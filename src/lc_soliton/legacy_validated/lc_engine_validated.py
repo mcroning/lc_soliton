@@ -78,7 +78,7 @@ from .td_runner import (
     _run_dg_td_experimental,
 )
 
-from .runner_utils import _prepare_substeps
+from ..helpers import _prepare_substeps
 
 # -----------------------------------------------------------------------------
 # Public runner

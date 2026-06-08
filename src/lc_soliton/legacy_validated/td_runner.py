@@ -9,7 +9,7 @@ from ..core.context import LCContext, LCParams, DualGrid
 from ..core.storage import LightStore
 from ..core.launch import intensity
 from ..core.dual_grid import restrict_block_mean, prolong_repeat
-from .runner_utils import residual_quality_info
+from ..helpers import residual_quality_info
 from ..validated_core.runner_core import (
     hop_linear as core_hop_linear,
     intens_into,
@@ -22,7 +22,7 @@ from ..validated_core.runner_core import (
 
 
 
-from .runner_utils import (
+from ..helpers import (
     normalize_info,
     _prepare_substeps,
     _prepare_legacy_plans,

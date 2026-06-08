@@ -13,7 +13,7 @@ from ..validated_core.runner_core import (
     lc_residual64,
 )
 
-from .runner_utils import (
+from ..helpers import (
     normalize_info,
     _prepare_substeps,
     _prepare_legacy_plans,
