@@ -9,6 +9,7 @@ import gc
 import json
 import math
 import os
+import platform
 import shutil
 import tempfile
 import time
@@ -17,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-
+import pandas as pd
 import numpy as np
 import cupy as cp
 import cupyx.scipy.fft as spfft
@@ -555,7 +556,33 @@ def solve_lc_optical_eigensoliton_v2(
             verbose=False,
         )
 
-        theta = ((1.0 - mix_theta) * theta + mix_theta * theta_new).astype(cp.float32, copy=False)
+        #theta = ((1.0 - mix_theta) * theta + mix_theta * theta_new).astype(cp.float32, copy=False)
+
+        Rmax_new = float(theta_info.get("max_interior", np.inf))
+        Rrms_new = float(theta_info.get("rms_interior", np.inf))
+
+        bad_theta_update = (
+            not np.isfinite(Rmax_new)
+            or not np.isfinite(Rrms_new)
+            or Rmax_new > 10.0
+            or Rrms_new > 0.2
+        )
+
+        mix_use = float(mix_theta)
+
+        if bad_theta_update:
+            mix_use = 0.0
+            if verbose:
+                print(
+                    f"[eig safeguard outer={outer:3d}] rejecting theta update: "
+                    f"Rmax={Rmax_new:.3e} Rrms={Rrms_new:.3e}"
+                )
+
+        theta = ((1.0 - mix_use) * theta + mix_use * theta_new).astype(cp.float32, copy=False)
+
+
+
+        
         theta = enforce_theta_constraints(theta, ctx.theta_clamp)
 
         eA = float(cp.linalg.norm((A - A_old).ravel()) / (cp.linalg.norm(A_old.ravel()) + 1e-30))

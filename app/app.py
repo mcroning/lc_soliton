@@ -35,7 +35,7 @@ from lc_soliton.physics.lc.bias import (
     compute_bi_from_power,
     reported_freedericksz_voltage,
 )
-
+from lc_soliton.eigensoliton_runner import run_eigensoliton_existence_curve
 
 def read_scalar_log_optional(scalar_log, st_obj=None):
     import pandas as pd
@@ -259,8 +259,8 @@ col_run, col_stop = st.columns(2)
 
 with col_run:
     run_button = st.button(
-        f"Run {selected_mode_label} case",
-        disabled=(workflow != "Single run"),
+        "Run existence curve sweep" if workflow == "Existence curve sweep" else f"Run {selected_mode_label} case",
+        disabled=(workflow not in {"Single run", "Existence curve sweep"}),
     )
 
 with col_stop:
@@ -322,6 +322,113 @@ if run_button:
     
     b_run = float(b_override) if use_b_override else b_live
     bi_run = float(bi_override) if use_bi_override else bi_live
+    
+    if workflow == "Existence curve sweep":
+        sweep_values = [
+            float(s.strip())
+            for s in sweep_values_text.split(",")
+            if s.strip()
+        ]
+
+        if sweep_param != "P_mW":
+            raise ValueError("Eigensoliton existence curve currently supports P_mW sweeps only.")
+
+        sweep_dir = run_dir / "existence_curve"
+        sweep_dir.mkdir(parents=True, exist_ok=True)
+
+        status_box.info(
+            f"Launching eigensoliton continuation with {len(sweep_values)} power points..."
+        )
+        progress_bar.progress(0)
+
+        request = SimulationRequest(
+            mode="strict_static",
+            grid=GridRequest(Nx=int(Nx), Ny=int(Ny), Nz=int(Nz)),
+            geometry=GeometryRequest(
+                xaper_um=float(xaper_um),
+                yaper_um=float(yaper_um),
+                dz_um=float(dz_um),
+                wavelength_um=0.633,
+            ),
+            material=MaterialRequest(
+                ne=float(ne),
+                no=float(no),
+                b=float(b_run),
+                bi=float(bi_run),
+                mobility=1.0,
+                theta_bc=float(theta_bc),
+                theta_bias_amp=0.1,
+                theta_clamp_min=-1.2,
+                theta_clamp_max=1.2,
+                theta_z_gamma=0.0,
+                K=float(K_SI),
+                De=float(De_rel),
+            ),
+            launch=LaunchRequest(
+                power_mW=float(sweep_values[0]),
+                waist_x_um=float(waist_x_um),
+                waist_y_um=float(waist_y_um),
+                separation_um=float(separation_um),
+                pair_angle_deg=float(pair_angle_deg),
+                theta_out1_deg=float(theta_out1_deg),
+                theta_out2_deg=float(theta_out2_deg),
+                phi1_deg=float(phi1_deg),
+                phi2_deg=float(phi2_deg),
+                power_ratio=float(power_ratio),
+                coherent=bool(coherent),
+            ),
+            boundary=BoundaryRequest(use_sponge=True, windowedge=0.1),
+            solver=SolverRequest(
+                static_max_steps=int(static_max_steps),
+                Nt=1,
+                dt=float(dt),
+                t_stride=int(t_stride),
+                dtau_static=float(dtau_static),
+                static_tol_rms=float(static_tol_rms),
+                static_tol_max=float(static_tol_max),
+                static_selfcons_passes=int(static_selfcons_passes),
+                static_mix=float(static_mix),
+                dz_opt_max_phi=float(dz_opt_max_phi),
+                dn_max_est=float(dn_max_est),
+                max_substeps=int(max_substeps),
+            ),
+            output=OutputRequest(
+                run_dir=str(sweep_dir),
+                save_slices=bool(save_slices),
+                save_full=bool(save_full),
+            ),
+            runtime=RuntimeRequest(backend="auto", progress=True),
+        )
+
+        result = run_eigensoliton_existence_curve(
+            request,
+            sweep_values,
+            run_dir=sweep_dir,
+            branch_name="fundamental",
+            mode_seed="00",
+            w0_um=float(waist_x_um),
+            checkpoint_prefix="lc_eigensoliton",
+            save_profiles=False,
+            live_plot=False,
+            solve_kwargs=dict(
+                max_outer=int(static_max_steps),
+                theta_residual_tol_rms=float(static_tol_rms),
+                theta_residual_tol_max=float(static_tol_max),
+            ),
+        )
+
+        st.session_state["last_run_dir"] = str(sweep_dir)
+        st.session_state["last_result"] = result
+        st.session_state["last_metadata"] = {}
+
+        status_box.success(
+            f"Eigensoliton existence curve finished: {result['n_completed']} branch points."
+        )
+        progress_bar.progress(100)
+        st.success(f"Wrote {result['csv']}")
+        st.stop()
+
+
 
 
 
