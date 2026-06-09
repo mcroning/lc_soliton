@@ -53,7 +53,7 @@ if False:
         theta_bias_2d_from_params,
     )
 
-from ..core.bias import (    
+from ..core.bias import (
     lc_b_from_voltage,
     voltage_from_lc_b,
     theta0_from_b_zero_bc,
@@ -64,9 +64,9 @@ from ..core.bias import (
 from ..core.context import (
     LCParams,
     LCContext,
-    DualGrid,    
-    apply_legacy_context_aliases,    
-    make_context,    
+    DualGrid,
+    apply_legacy_context_aliases,
+    make_context,
 )
 
 from ..core.storage import LightStore
@@ -79,6 +79,11 @@ from .td_runner import (
 )
 
 from .runner_utils import _prepare_substeps
+
+from lc_soliton.validated_core.stability_core import (
+    load_verified_profile,
+    install_launch_profile_into_ctx,
+)
 
 # -----------------------------------------------------------------------------
 # Public runner
@@ -110,17 +115,48 @@ def run_lc_validated(
     xp = ctx.xp
     apply_legacy_context_aliases(ctx, params)
 
-    ctx.theta_full = xp.stack([ctx.theta_bias_2d.copy() for _ in range(ctx.Nz)], axis=0).astype(xp.float32, copy=False)
+    ctx.theta_full = xp.stack(
+        [ctx.theta_bias_2d.copy() for _ in range(ctx.Nz)],
+        axis=0,
+    ).astype(xp.float32, copy=False)
 
+    launch_profile_path = getattr(params, "launch_profile_path", None)
+    print("launch_profile_path =", launch_profile_path)
+
+    if launch_profile_path:
+        mode_profile = load_verified_profile(launch_profile_path)
+
+        theta_source = getattr(
+            params,
+            "launch_profile_theta_source",
+            "Saved eigensoliton θ",
+        )
+
+        A0, theta0 = install_launch_profile_into_ctx(
+            ctx,
+            mode_profile,
+            use_saved_theta=(theta_source == "Saved eigensoliton θ"),
+        )
+
+        print(
+            "[profile launch]",
+            "P_mW=", mode_profile["P_mW"],
+            "beta=", mode_profile["beta"],
+            "theta_source=", theta_source,
+            "amp0_power=",
+            float(xp.sum(xp.abs(ctx.amp0) ** 2) * ctx.dx * ctx.dy),
+            "theta_full_max=",
+            float(xp.max(ctx.theta_full)),
+        )
     use_legacy_static = _HAS_CUPY and xp is _cupy and mode == "strict_static"
     use_legacy_td = _HAS_CUPY and xp is _cupy and mode == "td_predictor_only"
     use_legacy_dg_td = False
-    if mode == "strict_static" and not use_legacy_static:   
-        raise RuntimeError(    
-            "Validated strict_static currently requires CuPy/GPU. "    
-            "CPU physics execution is not validated yet."   
+    if mode == "strict_static" and not use_legacy_static:
+        raise RuntimeError(
+            "Validated strict_static currently requires CuPy/GPU. "
+            "CPU physics execution is not validated yet."
         )
-    
+
     if mode in {"strict_static", "td_predictor_only"} and not (_HAS_CUPY and xp is _cupy):
         if mode == "td_predictor_only":
             raise RuntimeError("Validated TD predictor requires CuPy/GPU. Use backend='auto' on a GPU node.")

@@ -44,6 +44,11 @@ from lc_soliton.request_translate import request_to_lcparams_kwargs
 from lc_soliton.core.context import LCParams, make_context
 from lc_soliton.core.backend import asnumpy
 
+from lc_soliton.validated_core.eigenmode_core import (
+    list_run_profiles,
+    read_profile_summary,
+)
+
 def read_scalar_log_optional(scalar_log, st_obj=None):
     import pandas as pd
     from pandas.errors import EmptyDataError, ParserError
@@ -265,12 +270,12 @@ col_bias, col_bias_info = st.columns([2, 1])
 with col_bias:
 
     fig, ax = plt.subplots(figsize=(3, 2))
-    
+
     ax.plot(
         x_um,
         np.degrees(theta_bias[:, mid_y]),
     )
-    
+
     theta_box = AnchoredText(
         f"$\\theta_0$ = {theta0_deg:.1f}°",
         loc="upper right",
@@ -278,31 +283,85 @@ with col_bias:
         frameon=True,
     )
     ax.add_artist(theta_box)
-    
+
     ax.set_title("LC bias profile", fontsize=10)
     ax.set_xlim(x_um[0],x_um[-1])
     ax.set_ylim(0,90)
     ax.set_xlabel("x (µm)")
     ax.set_ylabel("θ (deg)")
     ax.grid(True, alpha=0.3)
-    
+
     fig.tight_layout()
-    
+
     st.pyplot(fig, use_container_width=True)
 
 
-st.sidebar.header("Beam")
-waist_x_um = st.sidebar.number_input("waist x (µm)", value=3.0)
-waist_y_um = st.sidebar.number_input("waist y (µm)", value=3.0)
-separation_um = st.sidebar.number_input("beam separation (µm)", value=0.0)
-pair_angle_deg = st.sidebar.number_input("separation angle (deg)", value=0.0)
-power_ratio = st.sidebar.number_input("P2/P1", value=0.0, min_value=0.0)
+st.sidebar.header("Launch source")
 
-theta_out1_deg = st.sidebar.number_input("beam 1 polar angle (deg)", value=0.0)
-phi1_deg = st.sidebar.number_input("beam 1 azimuth (deg)", value=0.0)
-theta_out2_deg = st.sidebar.number_input("beam 2 polar angle (deg)", value=0.0)
-phi2_deg = st.sidebar.number_input("beam 2 azimuth (deg)", value=0.0)
-coherent = st.sidebar.checkbox("coherent beams", value=False)
+launch_source = st.sidebar.radio(
+    "Initial condition",
+    ["Build Gaussian beam(s)", "Use saved eigensoliton profile"],
+    index=0,
+)
+
+selected_profile_path = None
+selected_profile_summary = None
+profile_theta_source = "Saved eigensoliton θ"
+if launch_source == "Use saved eigensoliton profile":
+    profile_run_dir = st.sidebar.text_input(
+        "Eigensoliton run folder",
+        value=str(run_dir / "existence_curve"),
+    )
+
+    profiles = list_run_profiles(profile_run_dir)
+
+    if not profiles:
+        st.sidebar.warning("No eigensoliton profiles found.")
+    else:
+        summaries = [read_profile_summary(p) for p in profiles]
+        labels = [
+            f"{s['P_mW']:.4g} mW  β={s['beta']:.5g}"
+            for s in summaries
+        ]
+
+        choice = st.sidebar.selectbox("Saved eigenmode", labels)
+        idx = labels.index(choice)
+
+        selected_profile_path = str(profiles[idx])
+        selected_profile_summary = summaries[idx]
+
+        st.sidebar.caption(selected_profile_path)
+
+    profile_theta_source = st.sidebar.radio(
+        "Initial director θ",
+        ["Saved eigensoliton θ", "Bias θ only"],
+        index=0,
+    )
+
+    waist_x_um = 3.0
+    waist_y_um = 3.0
+    separation_um = 0.0
+    pair_angle_deg = 0.0
+    power_ratio = 0.0
+    theta_out1_deg = 0.0
+    phi1_deg = 0.0
+    theta_out2_deg = 0.0
+    phi2_deg = 0.0
+    coherent = False
+
+else:
+    st.sidebar.header("Beam")
+    waist_x_um = st.sidebar.number_input("waist x (µm)", value=3.0)
+    waist_y_um = st.sidebar.number_input("waist y (µm)", value=3.0)
+    separation_um = st.sidebar.number_input("beam separation (µm)", value=0.0)
+    pair_angle_deg = st.sidebar.number_input("separation angle (deg)", value=0.0)
+    power_ratio = st.sidebar.number_input("P2/P1", value=0.0, min_value=0.0)
+
+    theta_out1_deg = st.sidebar.number_input("beam 1 polar angle (deg)", value=0.0)
+    phi1_deg = st.sidebar.number_input("beam 1 azimuth (deg)", value=0.0)
+    theta_out2_deg = st.sidebar.number_input("beam 2 polar angle (deg)", value=0.0)
+    phi2_deg = st.sidebar.number_input("beam 2 azimuth (deg)", value=0.0)
+    coherent = st.sidebar.checkbox("coherent beams", value=False)
 
 st.sidebar.header("Solver")
 static_max_steps = st.sidebar.number_input("Static max steps", value=100, min_value=1, step=1)
@@ -331,7 +390,7 @@ with st.sidebar.expander("Advanced solver parameters"):
 # Main setup/status
 # -------------------------
 
-st.subheader("Current setup") 
+st.subheader("Current setup")
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("V", f"{V_bias:.4g} V")
@@ -405,6 +464,7 @@ def eig_progress(current, total, power_mW, phase="", outer=None, max_outer=None,
 
     status_box.info(msg)
 
+
 # -------------------------
 # Run engine
 # -------------------------
@@ -416,12 +476,14 @@ if run_button:
     st.session_state["last_result"] = {}
     st.session_state["last_metadata"] = {}
 
+
+
     progress_bar.progress(0)
     status_box.info(f"Launching {selected_mode_label} simulation...")
 
 
     # Recompute from live GUI values immediately before request construction
-    
+
     V_F = float(reported_freedericksz_voltage(K=float(K_SI), De=float(De_rel)))
     b_live = (3.141592653589793**2 / 8.0) * (float(V_bias) / V_F)**2
 
@@ -432,10 +494,10 @@ if run_button:
         ne=float(ne),
         no=float(no),
     ))
-    
+
     b_run = float(b_override) if use_b_override else b_live
     bi_run = float(bi_override) if use_bi_override else bi_live
-    
+
     if workflow == "Existence curve sweep":
         sweep_values = [
             float(s.strip())
@@ -513,6 +575,12 @@ if run_button:
             runtime=RuntimeRequest(backend="auto", progress=True),
         )
 
+
+        if launch_source == "Use saved eigensoliton profile":
+            if selected_profile_path is None:
+                raise ValueError("Use saved eigensoliton profile was selected, but no profile was chosen.")
+            setattr(request, "launch_profile_path", selected_profile_path)
+
         result = run_eigensoliton_existence_curve(
             request,
             sweep_values,
@@ -536,23 +604,23 @@ if run_button:
         st.session_state["last_metadata"] = {}
 
         df_curve = result.get("dataframe")
-        
+
         if df_curve is not None and len(df_curve):
             st.subheader("Eigensoliton existence curve")
-        
+
             df_good = df_curve[df_curve["theta_residual_rms"] < 5e-2].copy()
             df_bad = df_curve[df_curve["theta_residual_rms"] >= 5e-2].copy()
-        
+
             if len(df_bad):
                 st.warning(f"{len(df_bad)} branch point(s) exceeded residual tolerance and were excluded from plots.")
-        
+
             st.line_chart(df_good.set_index("P_mW")[["beta"]])
-        
+
             st.subheader("Mode widths")
             st.line_chart(df_good.set_index("P_mW")[["sx_um", "sy_um"]])
-        
+
             st.dataframe(df_curve)
-        
+
         status_box.success(
             f"Eigensoliton existence curve finished: {result['n_completed']} branch points."
         )
@@ -565,7 +633,7 @@ if run_button:
 
 
 
-    
+
     request = SimulationRequest(
         mode=selected_mode,
         grid=GridRequest(Nx=int(Nx), Ny=int(Ny), Nz=int(Nz)),
@@ -624,7 +692,14 @@ if run_button:
         ),
         runtime=RuntimeRequest(backend="auto", progress=True),
     )
+    if launch_source == "Use saved eigensoliton profile":
+        if selected_profile_path is None:
+            raise ValueError(
+                "Use saved eigensoliton profile was selected, but no profile was chosen."
+            )
 
+        setattr(request, "launch_profile_path", selected_profile_path)
+        setattr(request, "launch_profile_theta_source", profile_theta_source)
     try:
         with st.spinner("Running simulation..."):
             result = run_engine(
@@ -647,7 +722,7 @@ if run_button:
     finally:
         metadata_path = run_dir / "metadata.json"
         metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
-        
+
         if metadata_path.exists():
             metadata.update({
                 "V_bias": float(V_bias),
@@ -660,7 +735,7 @@ if run_button:
                 "windowedge": 0.1,
             })
             metadata_path.write_text(json.dumps(metadata, indent=2))
-        
+
         st.session_state["last_metadata"] = metadata
 
 
@@ -716,19 +791,19 @@ else:
                 horizontal=True,
                 key="final_intensity_slice_choice",
             )
-            
+
             if final_slice_choice == "yz":
                 final_path = run_dir / "Iyz.dat"
                 final_name = "Iyz"
             else:
                 final_path = run_dir / "Ixz.dat"
                 final_name = "Ixz"
-            
+
             if final_path.exists() and metadata and final_path.stat().st_size > 0:
                 Nz_meta = int(metadata["Nz"])
                 Nx_meta = int(metadata["Nx"])
                 Ny_meta = int(metadata["Ny"])
-            
+
                 if final_slice_choice == "yz":
                     frame_shape = (Nz_meta, Ny_meta)
                     frame_size = Nz_meta * Ny_meta
@@ -745,13 +820,13 @@ else:
                         0.5 * float(metadata["xaper_um"]),
                     ]
                     transverse_label = "x (µm)"
-            
+
                 n_values = final_path.stat().st_size // 4
                 nframes = n_values // frame_size
-            
+
                 if valid_saved_frames is not None:
                     nframes = min(nframes, valid_saved_frames)
-            
+
                 if nframes > 0:
                     arr = np.memmap(
                         final_path,
@@ -759,11 +834,11 @@ else:
                         mode="r",
                         shape=(nframes, *frame_shape),
                     )
-            
+
                     final_data = np.asarray(arr[nframes - 1])
-            
+
                     z_max_um = (Nz_meta - 1) * float(metadata["dz_um"])
-            
+
                     fig, ax = plt.subplots(figsize=(9, 4))
                     im = ax.imshow(
                         final_data.T,
@@ -776,12 +851,12 @@ else:
                             transverse_extent[1],
                         ],
                     )
-            
+
                     ax.set_xlabel("z (µm)")
                     ax.set_ylabel(transverse_label)
                     ax.set_title(f"Final saved {final_name} intensity, frame {nframes - 1}")
                     fig.colorbar(im, ax=ax, label="I")
-            
+
                     st.pyplot(fig)
                     plt.close(fig)
                 else:
@@ -1184,16 +1259,16 @@ else:
                 value=False,
                 key="show_trusted_config",
             )
-            
+
             if show_trusted_config:
                 st.json(cfg)
-            
+
             show_reference_json = st.checkbox(
                 "Show full reference JSON",
                 value=False,
                 key="show_reference_json",
             )
-            
+
             if show_reference_json:
                 st.json(reference_data)
 

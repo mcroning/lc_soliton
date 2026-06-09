@@ -56,7 +56,7 @@ def _add_request_metadata(run_dir: str | Path) -> None:
         "package_version": __version__,
         "translation_version": REQUEST_TRANSLATION_VERSION,
     }
-    
+
     path.write_text(json.dumps(metadata, indent=2))
 
 def available_engine_modes(include_experimental: bool = False):
@@ -83,23 +83,32 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
 
     if isinstance(mode_or_request, SimulationRequest):
         request = mode_or_request
-    
+
         if getattr(request, "params", None):
             raise ValueError(
                 "SimulationRequest.params is deprecated. "
                 "Use grid/geometry/material/launch/boundary/solver sections."
             )
-    
+
         from .request_validation import validate_request
         validate_request(request)
 
         mode = canonical_engine_mode(request.mode)
 
         from .request_translate import request_to_lcparams_kwargs
-        
+
         param_data = request_to_lcparams_kwargs(request)
-        
+
         params = LCParams(**param_data)
+        if getattr(request, "launch_profile_path", None):
+            setattr(params, "launch_profile_path", request.launch_profile_path)
+
+        if getattr(request, "launch_profile_theta_source", None):
+            setattr(
+                params,
+                "launch_profile_theta_source",
+                request.launch_profile_theta_source,
+            )
         from .request import save_request
 
         common_kwargs = dict(
@@ -118,7 +127,7 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
             request,
             Path(request.output.run_dir) / "request.json",
         )
-       
+
         if mode == "static":
             result = run_static(params, **common_kwargs)
             _add_request_metadata(request.output.run_dir)

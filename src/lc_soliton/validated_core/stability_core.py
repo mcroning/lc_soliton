@@ -395,7 +395,7 @@ def load_verified_profile(profile_path):
 
     return mode
 
-def install_launch_profile_into_ctx(ctx, mode):
+def install_launch_profile_into_ctx(ctx, mode, *, use_saved_theta=True):
     """
     Prepare ctx for launching this saved eigensoliton.
     Full-grid launch only.
@@ -410,18 +410,38 @@ def install_launch_profile_into_ctx(ctx, mode):
     ctx.bi = float(mode["bi"])
     ctx.theta_bc = float(mode["theta_bc"])
 
-    theta = mode["theta"].astype(cp.float32, copy=True)
-    theta[0, :] = cp.float32(ctx.theta_bc)
-    theta[-1, :] = cp.float32(ctx.theta_bc)
-    theta = enforce_theta_constraints(theta, ctx.theta_clamp)
+    A0 = mode["A"].astype(cp.complex64, copy=True)
+    theta_saved = mode["theta"].astype(cp.float32, copy=True)
 
-    # z-stack initialized to the eigensoliton director everywhere
+    expected = (int(ctx.Nx), int(ctx.Ny))
+
+    if tuple(A0.shape) != expected:
+        raise ValueError(f"Saved eigensoliton A grid {tuple(A0.shape)} does not match current run grid {expected}.")
+
+    if tuple(theta_saved.shape) != expected:
+        raise ValueError(f"Saved eigensoliton theta grid {tuple(theta_saved.shape)} does not match current run grid {expected}.")
+
+    if use_saved_theta:
+        theta = theta_saved
+        theta[0, :] = cp.float32(ctx.theta_bc)
+        theta[-1, :] = cp.float32(ctx.theta_bc)
+        theta = enforce_theta_constraints(theta, ctx.theta_clamp)
+    else:
+        theta = ctx.theta_bias_2d.astype(cp.float32, copy=True)
+
     ctx.theta_full = cp.repeat(theta[None, :, :], ctx.Nz, axis=0)
 
     if hasattr(ctx, "theta_prev_time"):
         ctx.theta_prev_time = ctx.theta_full.copy()
 
-    return mode["A"].astype(cp.complex64, copy=True), theta
+    Aset = cp.zeros((2, int(ctx.Nx), int(ctx.Ny)), dtype=cp.complex64)
+    Aset[0, :, :] = A0
+
+    ctx.amp0 = Aset.copy()
+    ctx.amp = Aset.copy()
+    ctx.amp_time_state = Aset.copy()
+
+    return A0, theta
 
 def launch_perturb_A(A, ctx, *, label="noise", eps=1e-5, seed=1):
     """
