@@ -41,6 +41,7 @@ def run_eigensoliton_existence_curve(
     request: SimulationRequest,
     powers_mW: Sequence[float],
     *,
+    progress_callback=None,
     run_dir: str | Path | None = None,
     branch_name: str = "fundamental",
     mode_seed: str = "00",
@@ -99,6 +100,7 @@ def run_eigensoliton_existence_curve(
         checkpoint_prefix=checkpoint_prefix,
         save_profiles=save_profiles,
         live_plot=live_plot,
+        progress_callback=progress_callback,
         **kwargs,
     )
 

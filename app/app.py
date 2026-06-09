@@ -6,10 +6,14 @@ from __future__ import annotations
 
 import json
 import re
+import numpy as np
+import pandas as pd
 from pathlib import Path
 
 import streamlit as st
 from PIL import Image
+import matplotlib.pyplot as plt
+from matplotlib.offsetbox import AnchoredText
 
 from lc_soliton import (
     SimulationRequest,
@@ -36,6 +40,9 @@ from lc_soliton.physics.lc.bias import (
     reported_freedericksz_voltage,
 )
 from lc_soliton.eigensoliton_runner import run_eigensoliton_existence_curve
+from lc_soliton.request_translate import request_to_lcparams_kwargs
+from lc_soliton.core.context import LCParams, make_context
+from lc_soliton.core.backend import asnumpy
 
 def read_scalar_log_optional(scalar_log, st_obj=None):
     import pandas as pd
@@ -72,6 +79,36 @@ def valid_saved_frames_from_scalar_log(df):
 def should_stop():
     return bool(st.session_state.get("stop_requested", False))
 
+def compute_gui_biased_material_values(
+    *,
+    V_bias,
+    P_mW,
+    K_SI,
+    De_rel,
+    ne,
+    no,
+    xaper_um,
+    use_b_override,
+    b_override,
+    use_bi_override,
+    bi_override,
+):
+    V_F = float(reported_freedericksz_voltage(K=float(K_SI), De=float(De_rel)))
+
+    b_live = float(compute_b_from_voltage(float(V_bias), K=float(K_SI), De=float(De_rel)))
+
+    bi_live = float(compute_bi_from_power(
+        float(P_mW),
+        d_um=float(xaper_um),
+        K=float(K_SI),
+        ne=float(ne),
+        no=float(no),
+    ))
+
+    b_run = float(b_override) if use_b_override else b_live
+    bi_run = float(bi_override) if use_bi_override else bi_live
+
+    return V_F, b_live, bi_live, b_run, bi_run
 
 st.set_page_config(page_title="LC Soliton", layout="wide")
 st.title("LC Soliton Simulator")
@@ -159,7 +196,7 @@ yaper_um = st.sidebar.number_input("y aperture (µm)", value=100.0)
 dz_um = st.sidebar.number_input("dz (µm)", value=5.0)
 
 st.sidebar.header("LC physics")
-V_bias = st.sidebar.number_input("Bias voltage V (V)", value=1.10, min_value=0.0, format="%.6g")
+V_bias = st.sidebar.number_input("Bias voltage V (V)", value=0.9144, min_value=0.0, format="%.6g")
 P_mW = st.sidebar.number_input("Optical power P (mW)", value=1.0, min_value=0.0, format="%.6g")
 theta_bc = st.sidebar.number_input("Boundary / pretilt θ_bc (rad)", value=0.0, format="%.6g")
 
@@ -169,23 +206,90 @@ with st.sidebar.expander("Material constants"):
     ne = st.number_input("ne", value=1.7, format="%.6g")
     no = st.number_input("no", value=1.5, format="%.6g")
 
-b_from_V = compute_b_from_voltage(V_bias, K=K_SI, De=De_rel)
-bi_from_P = compute_bi_from_power(P_mW, d_um=float(xaper_um), K=K_SI, ne=ne, no=no)
+b_live = float(compute_b_from_voltage(V_bias, K=K_SI, De=De_rel))
+bi_live = float(compute_bi_from_power(P_mW, d_um=float(xaper_um), K=K_SI, ne=ne, no=no))
 
 with st.sidebar.expander("Advanced: override derived b and bi"):
     use_b_override = st.checkbox("Override b", value=False)
-    b_override = st.number_input("b override", value=float(b_from_V), format="%.6g", disabled=not use_b_override)
+    b_override = st.number_input("b override", value=float(b_live), format="%.6g", disabled=not use_b_override)
 
     use_bi_override = st.checkbox("Override bi", value=False)
-    bi_override = st.number_input("bi override", value=float(bi_from_P), format="%.6g", disabled=not use_bi_override)
+    bi_override = st.number_input("bi override", value=float(bi_live), format="%.6g", disabled=not use_bi_override)
 
-b = float(b_override) if use_b_override else float(b_from_V)
-bi = float(bi_override) if use_bi_override else float(bi_from_P)
-V_F = reported_freedericksz_voltage(K=K_SI, De=De_rel)
+b_run = float(b_override) if use_b_override else b_live
+bi_run = float(bi_override) if use_bi_override else bi_live
+V_F = float(reported_freedericksz_voltage(K=K_SI, De=De_rel))
 
-st.sidebar.caption(f"Derived b = {b:.6g}")
-st.sidebar.caption(f"Derived bi = {bi:.6g}")
+b = b_run
+bi = bi_run
+
+st.sidebar.caption(f"Voltage-derived b = {b_live:.6g}")
+st.sidebar.caption(f"Power-derived bi = {bi_live:.6g}")
+st.sidebar.caption(f"Using b = {b_run:.6g}")
+st.sidebar.caption(f"Using bi = {bi_run:.6g}")
 st.sidebar.caption(f"Zero-pretilt Freedericksz V_F ≈ {V_F:.6g} V")
+
+
+
+params_preview = LCParams(
+    Nx=int(Nx),
+    Ny=int(Ny),
+    Nz=1,
+    xaper_um=float(xaper_um),
+    yaper_um=float(yaper_um),
+    dz_um=float(dz_um),
+    wavelength_um=0.633,
+    ne=float(ne),
+    no=float(no),
+    b=float(b_run),
+    bi=float(bi_run),
+    theta_bc=float(theta_bc),
+    K=float(K_SI),
+    De=float(De_rel),
+)
+
+ctx_preview, _ = make_context(params_preview)
+theta_bias = asnumpy(ctx_preview.theta_bias_2d)
+
+x_um = np.linspace(
+    -float(xaper_um) / 2,
+     float(xaper_um) / 2,
+     theta_bias.shape[0],
+)
+
+mid_y = theta_bias.shape[1] // 2
+theta0_deg = np.degrees(float(theta_bias[theta_bias.shape[0] // 2, mid_y]))
+
+col_bias, col_bias_info = st.columns([2, 1])
+
+with col_bias:
+
+    fig, ax = plt.subplots(figsize=(3, 2))
+    
+    ax.plot(
+        x_um,
+        np.degrees(theta_bias[:, mid_y]),
+    )
+    
+    theta_box = AnchoredText(
+        f"$\\theta_0$ = {theta0_deg:.1f}°",
+        loc="upper right",
+        prop={"size": 9},
+        frameon=True,
+    )
+    ax.add_artist(theta_box)
+    
+    ax.set_title("LC bias profile", fontsize=10)
+    ax.set_xlim(x_um[0],x_um[-1])
+    ax.set_ylim(0,90)
+    ax.set_xlabel("x (µm)")
+    ax.set_ylabel("θ (deg)")
+    ax.grid(True, alpha=0.3)
+    
+    fig.tight_layout()
+    
+    st.pyplot(fig, use_container_width=True)
+
 
 st.sidebar.header("Beam")
 waist_x_um = st.sidebar.number_input("waist x (µm)", value=3.0)
@@ -227,7 +331,7 @@ with st.sidebar.expander("Advanced solver parameters"):
 # Main setup/status
 # -------------------------
 
-st.subheader("Current setup")
+st.subheader("Current setup") 
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("V", f"{V_bias:.4g} V")
@@ -243,13 +347,8 @@ st.caption(
     f"dz={dz_um:.6g} µm"
 )
 
-if workflow == "Existence curve sweep":
-    st.info(
-        "Existence curve sweep placeholder: this will launch continuation runs over "
-        "P or V and save branch metrics such as β, width, residual, and convergence."
-    )
 
-elif workflow == "Log RMS / width stability monitor":
+if workflow == "Log RMS / width stability monitor":
     st.info(
         "Stability monitor placeholder: this will run grid/dz/dt studies and plot "
         "log residual RMS, width, centroid drift, and convergence floors."
@@ -290,7 +389,21 @@ def gui_progress(message):
         if total > 0:
             progress_bar.progress(min(max(current / total, 0.0), 1.0))
             return
+def eig_progress(current, total, power_mW, phase="", outer=None, max_outer=None, beta=None, rrms=None, rmax=None):
+    if outer is not None and max_outer is not None:
+        frac = (current + outer / max_outer) / max(total, 1)
+        msg = (
+            f"Eigensoliton sweep {current + 1}/{total}: "
+            f"P = {power_mW:.3g} mW, outer {outer}/{max_outer}"
+        )
+        if beta is not None and rrms is not None:
+            msg += f", β={beta:.4g}, Rrms={rrms:.2e}"
+    else:
+        frac = current / max(total, 1)
+        msg = f"Eigensoliton sweep {current}/{total}: P = {power_mW:.3g} mW"
+    progress_bar.progress(min(max(frac, 0.0), 1.0))
 
+    status_box.info(msg)
 
 # -------------------------
 # Run engine
@@ -404,11 +517,12 @@ if run_button:
             request,
             sweep_values,
             run_dir=sweep_dir,
+            progress_callback=eig_progress,
             branch_name="fundamental",
             mode_seed="00",
             w0_um=float(waist_x_um),
             checkpoint_prefix="lc_eigensoliton",
-            save_profiles=False,
+            save_profiles=True,
             live_plot=False,
             solve_kwargs=dict(
                 max_outer=int(static_max_steps),
@@ -421,6 +535,24 @@ if run_button:
         st.session_state["last_result"] = result
         st.session_state["last_metadata"] = {}
 
+        df_curve = result.get("dataframe")
+        
+        if df_curve is not None and len(df_curve):
+            st.subheader("Eigensoliton existence curve")
+        
+            df_good = df_curve[df_curve["theta_residual_rms"] < 5e-2].copy()
+            df_bad = df_curve[df_curve["theta_residual_rms"] >= 5e-2].copy()
+        
+            if len(df_bad):
+                st.warning(f"{len(df_bad)} branch point(s) exceeded residual tolerance and were excluded from plots.")
+        
+            st.line_chart(df_good.set_index("P_mW")[["beta"]])
+        
+            st.subheader("Mode widths")
+            st.line_chart(df_good.set_index("P_mW")[["sx_um", "sy_um"]])
+        
+            st.dataframe(df_curve)
+        
         status_box.success(
             f"Eigensoliton existence curve finished: {result['n_completed']} branch points."
         )
