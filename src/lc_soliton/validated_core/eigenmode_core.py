@@ -39,7 +39,7 @@ j = 1j
 
 from .runner_core import *
 from .launch_core import *
-
+from lc_soliton.core.context import LCParams, make_context, apply_legacy_context_aliases
 def xy_um_from_ctx(ctx):
     """
     Physical transverse coordinates in microns.
@@ -156,40 +156,52 @@ def rebuild_ctx_from_repro(repro):
     prdata = dict(repro["prdata"])
     c = repro["ctx"]
 
-    prdata["Nx"] = int(c["Nx"])
-    prdata["Ny"] = int(c["Ny"])
-    prdata["Nz"] = int(c["Nz"])
+    params = LCParams(
+        Nx=int(c["Nx"]),
+        Ny=int(c["Ny"]),
+        Nz=int(c.get("Nz", prdata.get("zsteps", 1))),
+        xaper_um=float(prdata.get("d", c["dx"] * int(c["Nx"]))),
+        yaper_um=float(c["dy"]) * int(c["Ny"]),
+        dz_um=float(c.get("dz", 1.0)),
+        wavelength_um=float(prdata.get("wavelength_um", c.get("lm", 0.633))),
+        ne=float(prdata.get("ne", c.get("ne", 1.7))),
+        no=float(prdata.get("no", c.get("no", 1.5))),
+        b=float(c.get("b", 0.0)),
+        bi=float(c.get("bi", 0.0)),
+        theta_bc=float(c.get("theta_bc", 0.0)),
+        theta_clamp_min=float(c.get("theta_clamp", [-1.2, 1.2])[0]),
+        theta_clamp_max=float(c.get("theta_clamp", [-1.2, 1.2])[1]),
+        theta_z_gamma=float(c.get("theta_z_gamma", 0.0)),
+        K=float(prdata.get("K", 7e-12)),
+        De=float(prdata.get("De", 13.0)),
+    )
 
-    prdata["dx"] = float(c["dx"])
-    prdata["dy"] = float(c["dy"])
-    prdata["dz"] = float(c["dz"])
+    ctx, _dg = make_context(params)
+    apply_legacy_context_aliases(ctx, params)
 
-    prdata["xsamp"] = int(c["Nx"])
-    prdata["ysamp"] = int(c["Ny"])
-    prdata["zsteps"] = int(c["Nz"])
-
-    out = initialize_lc_from_prdata(prdata)
-    ctx = out["ctx"] if isinstance(out, dict) else out
-
-    # Do NOT restore b/bi from repro.
-    # They can be stale/wrong, especially after continuation/polish.
-    skip = {
-        "ctx_theta",
-        "dual_grid",
-        "b",
-        "bi",
-        "use_dual_grid",
-    }
-
+    # Restore harmless scalar metadata expected by older stability helpers.
     for k, v in c.items():
-        if k in skip:
+        if k in {
+            "ctx_theta",
+            "dual_grid",
+            "use_dual_grid",
+            "theta_full",
+            "theta_bias_2d",
+        }:
+            continue
+        if hasattr(ctx, k):
             continue
         try:
             setattr(ctx, k, v)
         except Exception:
             pass
 
+    # Stability launches are full-grid for now.
     ctx.use_dual_grid = False
+    for attr in ["ctx_theta", "dual_grid"]:
+        if hasattr(ctx, attr):
+            delattr(ctx, attr)
+
     return ctx, prdata
 
 def assert_ctx_matches_mode(ctx, mode):

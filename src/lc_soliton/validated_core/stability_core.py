@@ -39,6 +39,27 @@ j = 1j
 from .runner_core import *
 from .eigenmode_core import *
 
+def _npz_float(z, key, default=np.nan):
+    try:
+        return float(z[key])
+    except KeyError:
+        return default
+
+
+def _npz_string_np(profile_path, key, default="UNKNOWN"):
+    with np.load(profile_path, allow_pickle=True) as z:
+        try:
+            value = z[key]
+        except KeyError:
+            return default
+
+    if hasattr(value, "item"):
+        value = value.item()
+    if isinstance(value, bytes):
+        return value.decode()
+
+    return str(value)
+
 def paired_stability_metrics(unpert_npz, pert_npz, ctx):
     u = cp.load(unpert_npz, allow_pickle=True)
     p = cp.load(pert_npz, allow_pickle=True)
@@ -483,6 +504,19 @@ def run_launch_zmarch(ctx, A_launch, *, runner_kwargs=None):
         ctx.amp = Aset.copy()
         ctx.amp_time_state = Aset.copy()
         ctx.save_full_I_mid_store = True
+
+        # Force runner_core to allocate fresh work buffers for this launch.
+        for name in [
+            "_amp_in_buf",
+            "_amp_out_buf",
+            "_amp_mid_buf",
+            "_amp_pred_buf",
+            "_phase_buf",
+            "_tmp_buf",
+            "_I_mid_pred_buf",
+        ]:
+            if hasattr(ctx, name):
+                delattr(ctx, name)
 
         print("launch power amp0:", float(cp.sum(cp.abs(ctx.amp0)**2) * ctx.dx * ctx.dy))
         print("launch power amp :", float(cp.sum(cp.abs(ctx.amp)**2) * ctx.dx * ctx.dy))
