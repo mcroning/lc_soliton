@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+import os
+from datetime import datetime
+
 import streamlit as st
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -49,6 +52,117 @@ from lc_soliton.validated_core.eigenmode_core import (
     read_profile_summary,
 )
 
+
+def request_to_gui_defaults(req: dict) -> dict:
+    mode = req.get("mode")
+
+    return {
+        "selected_mode_label": mode_labels.get(mode, mode),
+        # After loading a template, show the editable beam widgets.
+        "launch_source": "Build Gaussian beam(s)",
+
+        "Nx": req["grid"].get("Nx"),
+        "Ny": req["grid"].get("Ny"),
+        "Nz": req["grid"].get("Nz"),
+
+        "xaper_um": req["geometry"].get("xaper_um"),
+        "yaper_um": req["geometry"].get("yaper_um"),
+        "dz_um": req["geometry"].get("dz_um"),
+
+        "ne": req["material"].get("ne"),
+        "no": req["material"].get("no"),
+        "theta_bc": req["material"].get("theta_bc"),
+        "K_SI": req["material"].get("K"),
+        "De_rel": req["material"].get("De"),
+
+        "P_mW": req["launch"].get("power_mW"),
+        "waist_x_um": req["launch"].get("waist_x_um"),
+        "waist_y_um": req["launch"].get("waist_y_um"),
+        "separation_um": req["launch"].get("separation_um"),
+        "pair_angle_deg": req["launch"].get("pair_angle_deg"),
+        "power_ratio": req["launch"].get("power_ratio"),
+        "theta_out1_deg": req["launch"].get("theta_out1_deg"),
+        "theta_out2_deg": req["launch"].get("theta_out2_deg"),
+        "phi1_deg": req["launch"].get("phi1_deg"),
+        "phi2_deg": req["launch"].get("phi2_deg"),
+        "coherent": req["launch"].get("coherent"),
+
+        "static_max_steps": req["solver"].get("static_max_steps"),
+        "Nt": req["solver"].get("Nt"),
+        "dt": req["solver"].get("dt"),
+        "t_stride": req["solver"].get("t_stride"),
+        "dtau_static": req["solver"].get("dtau_static"),
+        "static_tol_rms": req["solver"].get("static_tol_rms"),
+        "static_tol_max": req["solver"].get("static_tol_max"),
+        "static_selfcons_passes": req["solver"].get("static_selfcons_passes"),
+        "static_mix": req["solver"].get("static_mix"),
+        "dz_opt_max_phi": req["solver"].get("dz_opt_max_phi"),
+        "dn_max_est": req["solver"].get("dn_max_est"),
+        "max_substeps": req["solver"].get("max_substeps"),
+
+        "save_slices": req["output"].get("save_slices"),
+        "save_full": req["output"].get("save_full"),
+    }
+
+
+def gui_default(key: str, fallback):
+    defaults = st.session_state.get("gui_template_defaults", {})
+    value = defaults.get(key, fallback)
+    return fallback if value is None else value
+
+
+# Streamlit widget helpers: initialize session_state once, then let the
+# widget own the key. This lets template loading set pending defaults
+# before widgets are instantiated without triggering Streamlit errors.
+def init_state_default(key: str, default):
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+
+def sb_text(label: str, key: str, default: str, **kwargs):
+    init_state_default(key, default)
+    return st.sidebar.text_input(label, key=key, **kwargs)
+
+
+def sb_checkbox(label: str, key: str, default: bool = False, **kwargs):
+    init_state_default(key, default)
+    return st.sidebar.checkbox(label, key=key, **kwargs)
+
+
+def sb_number(label: str, key: str, default, **kwargs):
+    init_state_default(key, default)
+    return st.sidebar.number_input(label, key=key, **kwargs)
+
+
+def sb_slider(label: str, key: str, min_value, max_value, default, **kwargs):
+    init_state_default(key, default)
+    return st.sidebar.slider(label, min_value, max_value, key=key, **kwargs)
+
+
+def sb_radio(label: str, key: str, options, default=None, **kwargs):
+    init_state_default(key, default if default is not None else options[0])
+    return st.sidebar.radio(label, options, key=key, **kwargs)
+
+
+def sb_selectbox(label: str, key: str, options, default=None, **kwargs):
+    init_state_default(key, default if default is not None else options[0])
+    return st.sidebar.selectbox(label, options, key=key, **kwargs)
+def list_child_dirs(path: Path):
+    try:
+        items = []
+        for p in path.iterdir():
+            if p.name.startswith("."):
+                continue
+            try:
+                if p.is_dir():
+                    items.append(p)
+            except OSError:
+                continue
+        return sorted(items, key=lambda p: p.name.lower())
+    except Exception:
+        return []
+
+            
 def read_scalar_log_optional(scalar_log, st_obj=None):
     import pandas as pd
     from pandas.errors import EmptyDataError, ParserError
@@ -121,11 +235,23 @@ st.title("LC Soliton Simulator")
 mode_options = available_engine_modes()
 mode_descriptions = describe_engine_modes()
 
+
+
 mode_labels = {
     "static": "Static",
     "time_dependent": "Time Dependent",
     "time_dependent_dual_grid": "Time Dependent (Dual Grid)",
 }
+
+# Apply a template request before any widgets are instantiated.
+# This avoids assigning to widget-owned keys after creation.
+if "pending_template_request" in st.session_state:
+    req = st.session_state.pop("pending_template_request")
+    defaults = request_to_gui_defaults(req)
+    for key, value in defaults.items():
+        if value is not None:
+            st.session_state[key] = value
+
 
 display_mode_labels = {
     "static": "Static",
@@ -135,6 +261,8 @@ display_mode_labels = {
     "time_dependent_dual_grid": "Time Dependent (Dual Grid)",
     "dg_td_predictor": "Time Dependent (Dual Grid)",
 }
+#from streamlit_file_browser import st_file_browser
+
 
 
 # -------------------------
@@ -143,40 +271,48 @@ display_mode_labels = {
 
 st.sidebar.header("Workflow")
 
-workflow = st.sidebar.radio(
+workflow = sb_radio(
     "Workflow",
+    "workflow",
     [
         "Single run",
         "Existence curve sweep",
         "Log RMS / width stability monitor",
     ],
-    index=0,
+    default="Single run",
 )
 
 if workflow == "Existence curve sweep":
     st.sidebar.info("Placeholder: continuation over P or V. Not wired yet.")
-    sweep_param = st.sidebar.selectbox("Sweep parameter", ["P_mW", "V_bias"])
-    sweep_values_text = st.sidebar.text_input(
+    sweep_param = sb_selectbox("Sweep parameter", "sweep_param", ["P_mW", "V_bias"], default="P_mW")
+    sweep_values_text = sb_text(
         "Sweep values",
-        value="0.1, 0.2, 0.5, 1.0, 2.0, 4.0",
+        "sweep_values_text",
+        "0.1, 0.2, 0.5, 1.0, 2.0, 4.0",
     )
 
 elif workflow == "Log RMS / width stability monitor":
     st.sidebar.info("Placeholder: grid, dz, and dt sensitivity studies. Not wired yet.")
-    monitor_param = st.sidebar.selectbox(
+    monitor_param = sb_selectbox(
         "Study parameter",
+        "monitor_param",
         ["dt", "dz_um", "Nx/Ny", "theta_bc", "P_mW", "V_bias"],
+        default="dt",
     )
-    monitor_values_text = st.sidebar.text_input(
+    monitor_values_text = sb_text(
         "Study values",
-        value="0.001, 0.0005, 0.00025",
+        "monitor_values_text",
+        "0.001, 0.0005, 0.00025",
     )
 
 st.sidebar.header("Run")
 
-selected_mode_label = st.sidebar.selectbox(
+mode_label_options = [mode_labels.get(mode, mode) for mode in mode_options]
+selected_mode_label = sb_selectbox(
     "Simulation mode",
-    [mode_labels.get(mode, mode) for mode in mode_options],
+    "selected_mode_label",
+    mode_label_options,
+    default=mode_label_options[0],
 )
 
 selected_mode = {
@@ -186,40 +322,175 @@ selected_mode = {
 
 st.sidebar.caption(mode_descriptions.get(selected_mode, ""))
 
-run_dir = Path(st.sidebar.text_input("Run folder", value="runs/streamlit_demo"))
-save_slices = st.sidebar.checkbox("Save xz/yz movie slices", value=True)
-save_full = st.sidebar.checkbox("Save full final theta", value=False)
+run_label = sb_text("Run label", "run_label", "streamlit_run")
+
+safe_label = "".join(
+    c if c.isalnum() or c in "-_." else "_"
+    for c in run_label
+)
+
+st.sidebar.subheader("Storage")
+
+if "pending_output_root_text" in st.session_state:
+    st.session_state["output_root_text"] = st.session_state.pop("pending_output_root_text")
+
+if "pending_replay_root_text" in st.session_state:
+    st.session_state["replay_root_text"] = st.session_state.pop("pending_replay_root_text")
+
+if "output_root_text" not in st.session_state:
+    st.session_state["output_root_text"] = str(
+        Path.home() / "lc_soliton_runs"
+    )
+
+output_root = Path(
+    sb_text("Output root", "output_root_text", str(Path.home() / "lc_soliton_runs"))
+).expanduser()
+
+if "replay_root_text" not in st.session_state:
+    st.session_state["replay_root_text"] = st.session_state["output_root_text"]
+
+replay_root = Path(
+    sb_text("Read/template root", "replay_root_text", st.session_state["output_root_text"])
+).expanduser()
+
+try:
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    testfile = output_root / ".write_test"
+    testfile.write_text("ok")
+    testfile.unlink()
+
+    output_ok = True
+
+except Exception as e:
+    output_ok = False
+    st.sidebar.error(f"Output root is not writable: {e}")
+
+replay_ok = replay_root.exists()
+
+if not replay_ok:
+    st.sidebar.warning("Read/template root does not exist.")
+
+with st.expander("Browse folders", expanded=False):
+    if "mini_browser_path" not in st.session_state:
+        st.session_state["mini_browser_path"] = str(Path.home())
+
+    current = Path(st.session_state["mini_browser_path"]).expanduser()
+
+    st.write(f"Current: `{current}`")
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        if st.button("⬆ Parent", key="mini_parent"):
+            st.session_state["mini_browser_path"] = str(current.parent)
+            st.rerun()
+
+    with c2:
+        if st.button("Use as output root", key="mini_use_output"):
+            st.session_state["pending_output_root_text"] = str(current)
+            st.rerun()
+    
+    with c3:
+        if st.button("Use as read/template root", key="mini_use_replay"):
+            st.session_state["pending_replay_root_text"] = str(current)
+            st.rerun() 
+
+    child_dirs = list_child_dirs(current)
+
+    if child_dirs:
+        picked = st.selectbox(
+            "Subfolders",
+            [p.name for p in child_dirs],
+            key="mini_subfolder",
+        )
+
+        if st.button("Open selected folder", key="mini_open"):
+            st.session_state["mini_browser_path"] = str(current / picked)
+            st.rerun()
+    else:
+        st.info("No readable subfolders.")
+
+
+    
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+run_dir = output_root / f"{safe_label}_{timestamp}"
+
+st.sidebar.caption(f"Output:\n`{output_root}`")
+st.sidebar.caption(f"Read:\n`{replay_root}`")
+st.sidebar.caption(f"New run directory:\n`{run_dir}`")
+
+save_slices = sb_checkbox("Save xz/yz movie slices", "save_slices", True)
+save_full = sb_checkbox("Save full final theta", "save_full", False)
 
 st.sidebar.header("Grid")
-Nx = st.sidebar.slider("Nx", 32, 512, 256, step=32)
-Ny = st.sidebar.slider("Ny", 32, 512, 256, step=32)
-Nz = st.sidebar.slider("Nz", 4, 600, 50)
+Nx = sb_slider("Nx", "Nx", 32, 512, 256, step=32)
+Ny = sb_slider("Ny", "Ny", 32, 512, 256, step=32)
+Nz = sb_slider("Nz", "Nz", 4, 600, 50)
 
 st.sidebar.header("Geometry")
-xaper_um = st.sidebar.number_input("x aperture / cell thickness d (µm)", value=75.0)
-yaper_um = st.sidebar.number_input("y aperture (µm)", value=100.0)
-dz_um = st.sidebar.number_input("dz (µm)", value=5.0)
+xaper_um = sb_number(
+    "x aperture / cell thickness d (µm)",
+    "xaper_um",
+    75.0,
+)
+yaper_um = sb_number("y aperture (µm)", "yaper_um", 100.0)
+dz_um = sb_number("dz (µm)", "dz_um", 5.0)
 
 st.sidebar.header("LC physics")
-V_bias = st.sidebar.number_input("Bias voltage V (V)", value=0.9144, min_value=0.0, format="%.6g")
-P_mW = st.sidebar.number_input("Optical power P (mW)", value=1.0, min_value=0.0, format="%.6g")
-theta_bc = st.sidebar.number_input("Boundary / pretilt θ_bc (rad)", value=0.0, format="%.6g")
+V_bias = sb_number(
+    "Bias voltage V (V)",
+    "V_bias",
+    0.9144,
+    min_value=0.0,
+    format="%.6g",
+)
+P_mW = sb_number(
+    "Optical power P (mW)",
+    "P_mW",
+    1.0,
+    min_value=0.0,
+    format="%.6g",
+)
+theta_bc = sb_number(
+    "Boundary / pretilt θ_bc (rad)",
+    "theta_bc",
+    0.0,
+    format="%.6g",
+)
 
 with st.sidebar.expander("Material constants"):
-    K_SI = st.number_input("Elastic constant K (SI)", value=7e-12, format="%.6g")
-    De_rel = st.number_input("Dielectric anisotropy Δε", value=13.0, format="%.6g")
-    ne = st.number_input("ne", value=1.7, format="%.6g")
-    no = st.number_input("no", value=1.5, format="%.6g")
+    init_state_default("K_SI", 7e-12)
+    init_state_default("De_rel", 13.0)
+    init_state_default("ne", 1.7)
+    init_state_default("no", 1.5)
+    K_SI = st.number_input("Elastic constant K (SI)", format="%.6g", key="K_SI")
+    De_rel = st.number_input("Dielectric anisotropy Δε", format="%.6g", key="De_rel")
+    ne = st.number_input("ne", format="%.6g", key="ne")
+    no = st.number_input("no", format="%.6g", key="no")
 
 b_live = float(compute_b_from_voltage(V_bias, K=K_SI, De=De_rel))
 bi_live = float(compute_bi_from_power(P_mW, d_um=float(xaper_um), K=K_SI, ne=ne, no=no))
 
 with st.sidebar.expander("Advanced: override derived b and bi"):
-    use_b_override = st.checkbox("Override b", value=False)
-    b_override = st.number_input("b override", value=float(b_live), format="%.6g", disabled=not use_b_override)
+    use_b_override = sb_checkbox("Override b", "use_b_override", False)
+    b_override = st.number_input(
+        "b override",
+        value=float(b_live),
+        format="%.6g",
+        disabled=not use_b_override,
+        key="b_override",
+    )
 
-    use_bi_override = st.checkbox("Override bi", value=False)
-    bi_override = st.number_input("bi override", value=float(bi_live), format="%.6g", disabled=not use_bi_override)
+    use_bi_override = sb_checkbox("Override bi", "use_bi_override", False)
+    bi_override = st.number_input(
+        "bi override",
+        value=float(bi_live),
+        format="%.6g",
+        disabled=not use_bi_override,
+        key="bi_override",
+    )
 
 b_run = float(b_override) if use_b_override else b_live
 bi_run = float(bi_override) if use_bi_override else bi_live
@@ -233,8 +504,6 @@ st.sidebar.caption(f"Power-derived bi = {bi_live:.6g}")
 st.sidebar.caption(f"Using b = {b_run:.6g}")
 st.sidebar.caption(f"Using bi = {bi_run:.6g}")
 st.sidebar.caption(f"Zero-pretilt Freedericksz V_F ≈ {V_F:.6g} V")
-
-
 
 params_preview = LCParams(
     Nx=int(Nx),
@@ -268,7 +537,6 @@ theta0_deg = np.degrees(float(theta_bias[theta_bias.shape[0] // 2, mid_y]))
 col_bias, col_bias_info = st.columns([2, 1])
 
 with col_bias:
-
     fig, ax = plt.subplots(figsize=(3, 2))
 
     ax.plot(
@@ -285,32 +553,74 @@ with col_bias:
     ax.add_artist(theta_box)
 
     ax.set_title("LC bias profile", fontsize=10)
-    ax.set_xlim(x_um[0],x_um[-1])
-    ax.set_ylim(0,90)
+    ax.set_xlim(x_um[0], x_um[-1])
+    ax.set_ylim(0, 90)
     ax.set_xlabel("x (µm)")
     ax.set_ylabel("θ (deg)")
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
-
     st.pyplot(fig, use_container_width=True)
-
 
 st.sidebar.header("Launch source")
 
-launch_source = st.sidebar.radio(
+launch_source = sb_radio(
     "Initial condition",
-    ["Build Gaussian beam(s)", "Use saved eigensoliton profile"],
-    index=0,
+    "launch_source",
+    [
+        "Build Gaussian beam(s)",
+        "Use saved eigensoliton profile",
+        "Load saved run as template",
+    ],
+    default="Build Gaussian beam(s)",
 )
 
 selected_profile_path = None
 selected_profile_summary = None
 profile_theta_source = "Saved eigensoliton θ"
-if launch_source == "Use saved eigensoliton profile":
-    profile_run_dir = st.sidebar.text_input(
+
+if launch_source == "Load saved run as template":
+    template_run_dir = sb_text(
+        "Template run folder",
+        "template_run_dir",
+        str(replay_root),
+    )
+
+    template_path = Path(template_run_dir).expanduser()
+    template_request_path = template_path / "request.json"
+
+    if not template_path.exists():
+        st.sidebar.warning("Template folder does not exist.")
+    elif not template_request_path.exists():
+        st.sidebar.warning("No request.json found in template folder.")
+    else:
+        st.sidebar.success("Template request.json found.")
+
+    if st.sidebar.button("Load template into GUI", key="load_template_button"):
+        if not template_request_path.exists():
+            st.sidebar.error("Cannot load template: request.json was not found.")
+        else:
+            req = json.loads(template_request_path.read_text())
+            st.session_state["pending_template_request"] = req
+            st.session_state["loaded_template_run_dir"] = str(template_path)
+            st.rerun()
+
+    waist_x_um = st.session_state.get("waist_x_um", 3.0)
+    waist_y_um = st.session_state.get("waist_y_um", 3.0)
+    separation_um = st.session_state.get("separation_um", 0.0)
+    pair_angle_deg = st.session_state.get("pair_angle_deg", 0.0)
+    power_ratio = st.session_state.get("power_ratio", 0.0)
+    theta_out1_deg = st.session_state.get("theta_out1_deg", 0.0)
+    phi1_deg = st.session_state.get("phi1_deg", 0.0)
+    theta_out2_deg = st.session_state.get("theta_out2_deg", 0.0)
+    phi2_deg = st.session_state.get("phi2_deg", 0.0)
+    coherent = st.session_state.get("coherent", False)
+
+elif launch_source == "Use saved eigensoliton profile":
+    profile_run_dir = sb_text(
         "Eigensoliton run folder",
-        value=str(run_dir / "existence_curve"),
+        "profile_run_dir",
+        str(replay_root / "existence_curve"),
     )
 
     profiles = list_run_profiles(profile_run_dir)
@@ -324,7 +634,7 @@ if launch_source == "Use saved eigensoliton profile":
             for s in summaries
         ]
 
-        choice = st.sidebar.selectbox("Saved eigenmode", labels)
+        choice = st.sidebar.selectbox("Saved eigenmode", labels, key="saved_eigenmode")
         idx = labels.index(choice)
 
         selected_profile_path = str(profiles[idx])
@@ -332,10 +642,22 @@ if launch_source == "Use saved eigensoliton profile":
 
         st.sidebar.caption(selected_profile_path)
 
-    profile_theta_source = st.sidebar.radio(
+        with st.sidebar.expander("Selected eigensoliton parameters", expanded=True):
+            st.write(f"P = {selected_profile_summary['P_mW']:.6g} mW")
+            st.write(f"β = {selected_profile_summary['beta']:.6g}")
+            st.write(f"b = {selected_profile_summary['b']:.6g}")
+            st.write(f"bi = {selected_profile_summary['bi']:.6g}")
+            st.write(f"θ_bc = {selected_profile_summary['theta_bc']:.6g}")
+            st.write(f"grid = {selected_profile_summary['A_shape']}")
+            st.caption(
+                "Saved-profile launches use the profile grid and physics parameters."
+            )
+
+    profile_theta_source = sb_radio(
         "Initial director θ",
+        "profile_theta_source",
         ["Saved eigensoliton θ", "Bias θ only"],
-        index=0,
+        default="Saved eigensoliton θ",
     )
 
     waist_x_um = 3.0
@@ -351,39 +673,58 @@ if launch_source == "Use saved eigensoliton profile":
 
 else:
     st.sidebar.header("Beam")
-    waist_x_um = st.sidebar.number_input("waist x (µm)", value=3.0)
-    waist_y_um = st.sidebar.number_input("waist y (µm)", value=3.0)
-    separation_um = st.sidebar.number_input("beam separation (µm)", value=0.0)
-    pair_angle_deg = st.sidebar.number_input("separation angle (deg)", value=0.0)
-    power_ratio = st.sidebar.number_input("P2/P1", value=0.0, min_value=0.0)
+    waist_x_um = sb_number("waist x (µm)", "waist_x_um", 3.0)
+    waist_y_um = sb_number("waist y (µm)", "waist_y_um", 3.0)
+    separation_um = sb_number("beam separation (µm)", "separation_um", 0.0)
+    pair_angle_deg = sb_number("separation angle (deg)", "pair_angle_deg", 0.0)
+    power_ratio = sb_number("P2/P1", "power_ratio", 0.0, min_value=0.0)
 
-    theta_out1_deg = st.sidebar.number_input("beam 1 polar angle (deg)", value=0.0)
-    phi1_deg = st.sidebar.number_input("beam 1 azimuth (deg)", value=0.0)
-    theta_out2_deg = st.sidebar.number_input("beam 2 polar angle (deg)", value=0.0)
-    phi2_deg = st.sidebar.number_input("beam 2 azimuth (deg)", value=0.0)
-    coherent = st.sidebar.checkbox("coherent beams", value=False)
+    theta_out1_deg = sb_number("beam 1 polar angle (deg)", "theta_out1_deg", 0.0)
+    phi1_deg = sb_number("beam 1 azimuth (deg)", "phi1_deg", 0.0)
+    theta_out2_deg = sb_number("beam 2 polar angle (deg)", "theta_out2_deg", 0.0)
+    phi2_deg = sb_number("beam 2 azimuth (deg)", "phi2_deg", 0.0)
+    coherent = sb_checkbox("coherent beams", "coherent", False)
 
 st.sidebar.header("Solver")
-static_max_steps = st.sidebar.number_input("Static max steps", value=100, min_value=1, step=1)
+static_max_steps = sb_number(
+    "Static max steps",
+    "static_max_steps",
+    100,
+    min_value=1,
+    step=1,
+)
 
 if selected_mode in {"time_dependent", "time_dependent_dual_grid"}:
-    Nt = st.sidebar.number_input("Time steps", value=100, min_value=1, step=1)
-    dt = st.sidebar.number_input("dt", value=5e-4, format="%.6g")
-    t_stride = st.sidebar.number_input("Output stride", value=1, min_value=1, step=1)
+    Nt = sb_number("Time steps", "Nt", 100, min_value=1, step=1)
+    dt = sb_number("dt", "dt", 5e-4, format="%.6g")
+    t_stride = sb_number("Output stride", "t_stride", 1, min_value=1, step=1)
 else:
     Nt = 1
     dt = 5e-4
     t_stride = 1
 
 with st.sidebar.expander("Advanced solver parameters"):
-    dtau_static = st.number_input("dtau_static", value=0.01, format="%.6g")
-    static_tol_rms = st.number_input("static_tol_rms", value=0.005, format="%.6g")
-    static_tol_max = st.number_input("static_tol_max", value=0.01, format="%.6g")
-    static_selfcons_passes = st.number_input("static_selfcons_passes", value=3, min_value=1, step=1)
-    static_mix = st.number_input("static_mix", value=0.3, format="%.6g")
-    dz_opt_max_phi = st.number_input("dz_opt_max_phi", value=0.3, format="%.6g")
-    dn_max_est = st.number_input("dn_max_est", value=0.02, format="%.6g")
-    max_substeps = st.number_input("max_substeps", value=16, min_value=1, step=1)
+    init_state_default("dtau_static", 0.01)
+    init_state_default("static_tol_rms", 0.005)
+    init_state_default("static_tol_max", 0.01)
+    init_state_default("static_selfcons_passes", 3)
+    init_state_default("static_mix", 0.3)
+    init_state_default("dz_opt_max_phi", 0.3)
+    init_state_default("dn_max_est", 0.02)
+    init_state_default("max_substeps", 16)
+    dtau_static = st.number_input("dtau_static", format="%.6g", key="dtau_static")
+    static_tol_rms = st.number_input("static_tol_rms", format="%.6g", key="static_tol_rms")
+    static_tol_max = st.number_input("static_tol_max", format="%.6g", key="static_tol_max")
+    static_selfcons_passes = st.number_input(
+        "static_selfcons_passes",
+        min_value=1,
+        step=1,
+        key="static_selfcons_passes",
+    )
+    static_mix = st.number_input("static_mix", format="%.6g", key="static_mix")
+    dz_opt_max_phi = st.number_input("dz_opt_max_phi", format="%.6g", key="dz_opt_max_phi")
+    dn_max_est = st.number_input("dn_max_est", format="%.6g", key="dn_max_est")
+    max_substeps = st.number_input("max_substeps", min_value=1, step=1, key="max_substeps")
 
 
 # -------------------------
@@ -418,7 +759,7 @@ col_run, col_stop = st.columns(2)
 with col_run:
     run_button = st.button(
         "Run existence curve sweep" if workflow == "Existence curve sweep" else f"Run {selected_mode_label} case",
-        disabled=(workflow not in {"Single run", "Existence curve sweep"}),
+        disabled=(workflow not in {"Single run", "Existence curve sweep"} or not output_ok),
     )
 
 with col_stop:
@@ -471,7 +812,14 @@ def eig_progress(current, total, power_mW, phase="", outer=None, max_outer=None,
 
 if run_button:
     st.session_state["stop_requested"] = False
+
+    # Output destination for this new run
     st.session_state["last_run_dir"] = str(run_dir)
+    st.session_state["last_output_root"] = str(output_root)
+
+    # Input/replay source used for saved profiles or recreated runs
+    st.session_state["last_replay_root"] = str(replay_root)
+
     st.session_state["last_mode"] = selected_mode
     st.session_state["last_result"] = {}
     st.session_state["last_metadata"] = {}
@@ -510,11 +858,14 @@ if run_button:
 
         sweep_dir = run_dir / "existence_curve"
         sweep_dir.mkdir(parents=True, exist_ok=True)
+        st.write(f"Existence curve output: {sweep_dir}")
 
         status_box.info(
             f"Launching eigensoliton continuation with {len(sweep_values)} power points..."
         )
         progress_bar.progress(0)
+
+
 
         request = SimulationRequest(
             mode="strict_static",
@@ -567,6 +918,7 @@ if run_button:
                 dn_max_est=float(dn_max_est),
                 max_substeps=int(max_substeps),
             ),
+
             output=OutputRequest(
                 run_dir=str(sweep_dir),
                 save_slices=bool(save_slices),
@@ -574,13 +926,16 @@ if run_button:
             ),
             runtime=RuntimeRequest(backend="auto", progress=True),
         )
-
-
+            
+        
         if launch_source == "Use saved eigensoliton profile":
             if selected_profile_path is None:
-                raise ValueError("Use saved eigensoliton profile was selected, but no profile was chosen.")
-            setattr(request, "launch_profile_path", selected_profile_path)
-
+                raise ValueError(
+                    "Use saved eigensoliton profile was selected, but no profile was chosen."
+                )
+        
+            setattr(request, "launch_profile_path", str(selected_profile_path))
+        
         result = run_eigensoliton_existence_curve(
             request,
             sweep_values,
@@ -598,12 +953,17 @@ if run_button:
                 theta_residual_tol_max=float(static_tol_max),
             ),
         )
-
+        
         st.session_state["last_run_dir"] = str(sweep_dir)
+        st.session_state["last_output_root"] = str(output_root)
+        st.session_state["last_replay_root"] = str(replay_root)
         st.session_state["last_result"] = result
         st.session_state["last_metadata"] = {}
-
+        
         df_curve = result.get("dataframe")
+
+
+        
 
         if df_curve is not None and len(df_curve):
             st.subheader("Eigensoliton existence curve")
@@ -628,37 +988,63 @@ if run_button:
         st.success(f"Wrote {result['csv']}")
         st.stop()
 
+    P_request = float(P_mW)
+    b_request = float(b_run)
+    bi_request = float(bi_run)
+    theta_bc_request = float(theta_bc)
 
 
 
+    Nx_request = int(Nx)
+    Ny_request = int(Ny)
+    
+    if (
+        launch_source == "Use saved eigensoliton profile"
+        and selected_profile_summary is not None
+    ):
+        P_request = float(selected_profile_summary["P_mW"])
+        b_request = float(selected_profile_summary["b"])
+        bi_request = float(selected_profile_summary["bi"])
+        theta_bc_request = float(selected_profile_summary["theta_bc"])
+    
+        if selected_profile_summary.get("A_shape") is not None:
+            Nx_request = int(selected_profile_summary["A_shape"][0])
+            Ny_request = int(selected_profile_summary["A_shape"][1])
+    print(
+        "[request physics]",
+        "P=", P_request,
+        "b=", b_request,
+        "bi=", bi_request,
+        "theta_bc=", theta_bc_request,
+    )
 
 
 
     request = SimulationRequest(
         mode=selected_mode,
-        grid=GridRequest(Nx=int(Nx), Ny=int(Ny), Nz=int(Nz)),
+        grid=GridRequest(Nx=int(Nx_request), Ny=int(Ny_request), Nz=int(Nz)),
         geometry=GeometryRequest(
             xaper_um=float(xaper_um),
             yaper_um=float(yaper_um),
             dz_um=float(dz_um),
             wavelength_um=0.633,
         ),
-    material=MaterialRequest(
-        ne=float(ne),
-        no=float(no),
-        b=float(b_run),
-        bi=float(bi_run),
-        mobility=1.0,
-        theta_bc=float(theta_bc),
-        theta_bias_amp=0.1,
-        theta_clamp_min=-1.2,
-        theta_clamp_max=1.2,
-        theta_z_gamma=0.0,
-        K=float(K_SI),
-        De=float(De_rel),
-    ),
+        material=MaterialRequest(
+            ne=float(ne),    
+            no=float(no),    
+            b=float(b_request),    
+            bi=float(bi_request),    
+            mobility=1.0,    
+            theta_bc=float(theta_bc_request),
+            theta_bias_amp=0.1,
+            theta_clamp_min=-1.2,
+            theta_clamp_max=1.2,
+            theta_z_gamma=0.0,
+            K=float(K_SI),
+            De=float(De_rel),
+        ),
         launch=LaunchRequest(
-            power_mW=float(P_mW),
+            power_mW=float(P_request),
             waist_x_um=float(waist_x_um),
             waist_y_um=float(waist_y_um),
             separation_um=float(separation_um),
@@ -749,6 +1135,16 @@ else:
     import matplotlib.pyplot as plt
     import numpy as np
 
+    if "last_replay_root" in st.session_state:
+        replay_display_root = Path(st.session_state["last_replay_root"])
+
+        if st.button("Display selected read/recreate folder"):
+            st.session_state["last_run_dir"] = str(replay_display_root)
+            st.session_state["last_result"] = {}
+            st.session_state["last_metadata"] = {}
+            st.rerun()
+
+    
     run_dir = Path(st.session_state["last_run_dir"])
     metadata = st.session_state.get("last_metadata", {})
     result = st.session_state.get("last_result", {})
