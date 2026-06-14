@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-06-14T16:13:50.554880+00:00",
+  "lc_soliton_version": "0.0.2",
+  "lc_soliton_version_name": "public-api",
+  "python_version": "3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:27:36) [GCC 11.2.0]",
+  "python_executable": "/cluster/tufts/hpc/apps/rhel8/external/apps/anaconda/202410/bin/python",
+  "platform": "Linux-5.14.0-570.58.1.el9_6.x86_64-x86_64-with-glibc2.34",
+  "hostname": "pax003",
+  "numpy_version": "1.26.4",
+  "scipy_version": "1.13.1",
+  "cupy_version": "13.6.0",
+  "cuda_device_count": 1,
+  "cuda_device_0_name": "NVIDIA A100-PCIE-40GB"
+}

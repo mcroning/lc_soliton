@@ -1,0 +1,50 @@
+{
+  "created_unix": 1781454075.6231265,
+  "branch_name": "fundamental",
+  "checkpoint_prefix": "lc_eigensoliton",
+  "powers_mW": [
+    0.1,
+    0.2,
+    0.5
+  ],
+  "subtract_carrier": true,
+  "prdata": {
+    "d": 75.0,
+    "K": 7e-12,
+    "ne": 1.7,
+    "no": 1.5,
+    "De": 13.0,
+    "wavelength_um": 0.633
+  },
+  "ctx": {
+    "Nx": 128,
+    "Ny": 128,
+    "Nz": 50,
+    "dx": 0.5859375,
+    "dy": 0.78125,
+    "dz": 5.0,
+    "lm": 0.633,
+    "ne": 1.7,
+    "no": 1.5,
+    "refin": 1.547844409942627,
+    "b": 1.718570203405714,
+    "bi": 214.28571428571414,
+    "theta_bc": 0.0,
+    "theta_clamp": [
+      -1.2,
+      1.2
+    ],
+    "theta_z_gamma": 0.0,
+    "use_dual_grid": false,
+    "picard_iters": 4,
+    "picard_tol_up": 1e-06,
+    "theta_z_stride_um": 0.0
+  },
+  "solve_kwargs": {
+    "max_outer": 100,
+    "theta_residual_tol_rms": 0.005,
+    "theta_residual_tol_max": 0.01
+  },
+  "python": "3.12.7",
+  "platform": "Linux-5.14.0-570.58.1.el9_6.x86_64-x86_64-with-glibc2.34"
+}

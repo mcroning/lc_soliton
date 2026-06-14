@@ -1,0 +1,69 @@
+{
+  "mode": "time_dependent",
+  "grid": {
+    "Nx": 128,
+    "Ny": 128,
+    "Nz": 50
+  },
+  "geometry": {
+    "xaper_um": 75.0,
+    "yaper_um": 100.0,
+    "dz_um": 5.0,
+    "wavelength_um": 0.633
+  },
+  "material": {
+    "ne": 1.7,
+    "no": 1.5,
+    "b": 1.718570203405714,
+    "bi": 214.28571428571414,
+    "mobility": 1.0,
+    "theta_bc": 0.0,
+    "theta_bias_amp": 0.1,
+    "theta_clamp_min": -1.2,
+    "theta_clamp_max": 1.2,
+    "theta_z_gamma": 0.0,
+    "K": 7e-12,
+    "De": 13.0
+  },
+  "launch": {
+    "power_mW": 1.0,
+    "waist_um": 4.0,
+    "waist_x_um": 3.0,
+    "waist_y_um": 3.0,
+    "separation_um": 0.0,
+    "coherent": false,
+    "pair_angle_deg": 0.0,
+    "theta_out1_deg": 0.0,
+    "theta_out2_deg": 0.0,
+    "phi1_deg": 0.0,
+    "phi2_deg": 0.0,
+    "power_ratio": 0.0
+  },
+  "boundary": {
+    "use_sponge": true,
+    "windowedge": 0.1
+  },
+  "solver": {
+    "static_max_steps": 100,
+    "Nt": 100,
+    "dt": 0.0005,
+    "t_stride": 1,
+    "dz_opt_max_phi": 0.3,
+    "dn_max_est": 0.02,
+    "max_substeps": 16,
+    "dtau_static": 0.01,
+    "static_tol_rms": 0.005,
+    "static_tol_max": 0.01,
+    "static_selfcons_passes": 3,
+    "static_mix": 0.3
+  },
+  "output": {
+    "run_dir": "/cluster/home/mcroning/lc_soliton_package_migration/lc_soliton_publishable/small_runs/td_run_20260614_121216",
+    "save_slices": true,
+    "save_full": false
+  },
+  "runtime": {
+    "backend": "auto",
+    "progress": true
+  }
+}
