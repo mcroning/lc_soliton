@@ -54,54 +54,81 @@ from lc_soliton.validated_core.eigenmode_core import (
 
 
 def request_to_gui_defaults(req: dict) -> dict:
-    mode = req.get("mode")
+    mode = normalize_gui_mode(req.get("mode"))
+    
+    grid = req.get("grid", req)
+    geometry = req.get("geometry", req)
+    material = req.get("material", req)
+    launch = req.get("launch", req)
+    solver = req.get("solver", req)
+    output = req.get("output", req)
 
     return {
         "selected_mode_label": mode_labels.get(mode, mode),
-        # After loading a template, show the editable beam widgets.
+
+        # After loading a template, show editable beam controls.
         "launch_source": "Build Gaussian beam(s)",
 
-        "Nx": req["grid"].get("Nx"),
-        "Ny": req["grid"].get("Ny"),
-        "Nz": req["grid"].get("Nz"),
+        # Grid
+        "Nx": grid.get("Nx"),
+        "Ny": grid.get("Ny"),
+        "Nz": grid.get("Nz"),
 
-        "xaper_um": req["geometry"].get("xaper_um"),
-        "yaper_um": req["geometry"].get("yaper_um"),
-        "dz_um": req["geometry"].get("dz_um"),
+        # Geometry
+        "xaper_um": geometry.get("xaper_um"),
+        "yaper_um": geometry.get("yaper_um"),
+        "dz_um": geometry.get("dz_um"),
 
-        "ne": req["material"].get("ne"),
-        "no": req["material"].get("no"),
-        "theta_bc": req["material"].get("theta_bc"),
-        "K_SI": req["material"].get("K"),
-        "De_rel": req["material"].get("De"),
+        # Material
+        "ne": material.get("ne"),
+        "no": material.get("no"),
+        "theta_bc": material.get("theta_bc"),
+        "K_SI": material.get("K"),
+        "De_rel": material.get("De"),
 
-        "P_mW": req["launch"].get("power_mW"),
-        "waist_x_um": req["launch"].get("waist_x_um"),
-        "waist_y_um": req["launch"].get("waist_y_um"),
-        "separation_um": req["launch"].get("separation_um"),
-        "pair_angle_deg": req["launch"].get("pair_angle_deg"),
-        "power_ratio": req["launch"].get("power_ratio"),
-        "theta_out1_deg": req["launch"].get("theta_out1_deg"),
-        "theta_out2_deg": req["launch"].get("theta_out2_deg"),
-        "phi1_deg": req["launch"].get("phi1_deg"),
-        "phi2_deg": req["launch"].get("phi2_deg"),
-        "coherent": req["launch"].get("coherent"),
+        # Physics
+        "V_bias": req.get("V_bias"),
+        "P_mW": req.get("P_mW", launch.get("power_mW")),
 
-        "static_max_steps": req["solver"].get("static_max_steps"),
-        "Nt": req["solver"].get("Nt"),
-        "dt": req["solver"].get("dt"),
-        "t_stride": req["solver"].get("t_stride"),
-        "dtau_static": req["solver"].get("dtau_static"),
-        "static_tol_rms": req["solver"].get("static_tol_rms"),
-        "static_tol_max": req["solver"].get("static_tol_max"),
-        "static_selfcons_passes": req["solver"].get("static_selfcons_passes"),
-        "static_mix": req["solver"].get("static_mix"),
-        "dz_opt_max_phi": req["solver"].get("dz_opt_max_phi"),
-        "dn_max_est": req["solver"].get("dn_max_est"),
-        "max_substeps": req["solver"].get("max_substeps"),
+        # Beam
+        "waist_x_um": launch.get("waist_x_um"),
+        "waist_y_um": launch.get("waist_y_um"),
 
-        "save_slices": req["output"].get("save_slices"),
-        "save_full": req["output"].get("save_full"),
+        # old metadata used y_sep_um
+        "separation_um": launch.get(
+            "separation_um",
+            req.get("separation_um", req.get("y_sep_um")),
+        ),
+
+        "pair_angle_deg": launch.get("pair_angle_deg"),
+        "power_ratio": launch.get("power_ratio"),
+
+        "theta_out1_deg": launch.get("theta_out1_deg"),
+        "theta_out2_deg": launch.get("theta_out2_deg"),
+        "phi1_deg": launch.get("phi1_deg"),
+        "phi2_deg": launch.get("phi2_deg"),
+
+        "coherent": launch.get("coherent"),
+
+        # Solver
+        "static_max_steps": solver.get("static_max_steps"),
+        "Nt": solver.get("Nt"),
+        "dt": solver.get("dt"),
+        "t_stride": solver.get("t_stride"),
+
+        "dtau_static": solver.get("dtau_static"),
+        "static_tol_rms": solver.get("static_tol_rms"),
+        "static_tol_max": solver.get("static_tol_max"),
+        "static_selfcons_passes": solver.get("static_selfcons_passes"),
+        "static_mix": solver.get("static_mix"),
+
+        "dz_opt_max_phi": solver.get("dz_opt_max_phi"),
+        "dn_max_est": solver.get("dn_max_est"),
+        "max_substeps": solver.get("max_substeps"),
+
+        # Output
+        "save_slices": output.get("save_slices"),
+        "save_full": output.get("save_full"),
     }
 
 
@@ -116,7 +143,7 @@ def gui_default(key: str, fallback):
 # before widgets are instantiated without triggering Streamlit errors.
 def init_state_default(key: str, default):
     if key not in st.session_state:
-        st.session_state[key] = default
+        st.session_state[key] = gui_default(key, default)
 
 
 def sb_text(label: str, key: str, default: str, **kwargs):
@@ -228,6 +255,14 @@ def compute_gui_biased_material_values(
     bi_run = float(bi_override) if use_bi_override else bi_live
 
     return V_F, b_live, bi_live, b_run, bi_run
+
+def normalize_gui_mode(mode):
+    aliases = {
+        "strict_static": "static",
+        "td_predictor_only": "time_dependent",
+        "dg_td_predictor": "time_dependent_dual_grid",
+    }
+    return aliases.get(mode, mode)
 
 st.set_page_config(page_title="LC Soliton", layout="wide")
 st.title("LC Soliton Simulator")
@@ -379,7 +414,7 @@ with st.expander("Browse folders", expanded=False):
 
     st.write(f"Current: `{current}`")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
         if st.button("⬆ Parent", key="mini_parent"):
@@ -394,7 +429,17 @@ with st.expander("Browse folders", expanded=False):
     with c3:
         if st.button("Use as read/template root", key="mini_use_replay"):
             st.session_state["pending_replay_root_text"] = str(current)
-            st.rerun() 
+            st.rerun()
+    with c4:
+        if st.button("Use as template run", key="mini_use_template"):
+            st.session_state["pending_template_run_dir"] = str(current)
+            st.rerun()
+    with c5:
+        if st.button("Display this run", key="mini_display_run"):
+            st.session_state["last_run_dir"] = str(current)
+            st.session_state["last_result"] = {}
+            st.session_state["last_metadata"] = {}
+            st.rerun()
 
     child_dirs = list_child_dirs(current)
 
@@ -457,6 +502,7 @@ theta_bc = sb_number(
     "Boundary / pretilt θ_bc (rad)",
     "theta_bc",
     0.0,
+    min_value=0.0,
     format="%.6g",
 )
 
@@ -579,11 +625,19 @@ selected_profile_path = None
 selected_profile_summary = None
 profile_theta_source = "Saved eigensoliton θ"
 
+if "pending_template_run_dir" in st.session_state:
+    st.session_state["loaded_template_run_dir"] = st.session_state.pop(
+        "pending_template_run_dir"
+    )
+
 if launch_source == "Load saved run as template":
-    template_run_dir = sb_text(
+    template_run_dir = st.sidebar.text_input(
         "Template run folder",
-        "template_run_dir",
-        str(replay_root),
+        value=st.session_state.get(
+            "loaded_template_run_dir",
+            str(replay_root),
+        ),
+        key="template_run_dir",
     )
 
     template_path = Path(template_run_dir).expanduser()
@@ -601,7 +655,18 @@ if launch_source == "Load saved run as template":
             st.sidebar.error("Cannot load template: request.json was not found.")
         else:
             req = json.loads(template_request_path.read_text())
-            st.session_state["pending_template_request"] = req
+    
+            metadata_path = template_path / "metadata.json"
+            if metadata_path.exists():
+                metadata = json.loads(metadata_path.read_text())
+                req.update(metadata)
+    
+            defaults = request_to_gui_defaults(req)
+    
+            for key in defaults:
+                st.session_state.pop(key, None)
+    
+            st.session_state["gui_template_defaults"] = defaults
             st.session_state["loaded_template_run_dir"] = str(template_path)
             st.rerun()
 
