@@ -1680,70 +1680,86 @@ else:
             with st.expander("metadata.json"):
                 st.json(metadata)
 
-        with st.expander("Reference validation / regression tests"):
-            reference_names = available_reference_cases()
+        with st.expander("Reference validation / regression tests", expanded=False):
+            try:
+                reference_names = available_reference_cases()
+            except Exception as exc:
+                reference_names = []
+                st.info(f"No reference cases available: {exc}")
 
-            selected_reference = st.selectbox(
-                "Reference case",
-                reference_names,
-                index=reference_names.index("strict_static_centroid_drift")
-                if "strict_static_centroid_drift" in reference_names
-                else 0,
-            )
+            if not reference_names:
+                st.info(
+                    "Reference validation is not bundled with this demo build. "
+                    "The GUI can still run simulations, reload templates, and display saved runs."
+                )
+            else:
+                selected_reference = st.selectbox(
+                    "Reference case",
+                    reference_names,
+                    index=reference_names.index("strict_static_centroid_drift")
+                    if "strict_static_centroid_drift" in reference_names
+                    else 0,
+                )
 
-            summary = summarize_reference_case(selected_reference)
-            reference_data = load_reference_case(selected_reference)
+                try:
+                    summary = summarize_reference_case(selected_reference)
+                    reference_data = load_reference_case(selected_reference)
+                except Exception as exc:
+                    st.warning(f"Reference case unavailable: {exc}")
+                    summary = {}
+                    reference_data = {}
 
-            st.caption(
-                f"Reference summary: max_residual_rms={summary.get('max_residual_rms', 'n/a')}"
-            )
+                st.caption(
+                    f"Reference summary: max_residual_rms={summary.get('max_residual_rms', 'n/a')}"
+                )
 
-            cfg = reference_data.get("config", {})
-            c1, c2, c3 = st.columns(3)
-            c1.metric("b", cfg.get("material", {}).get("b", "n/a"))
-            c2.metric("bi", cfg.get("material", {}).get("bi", "n/a"))
-            c3.metric("dz (µm)", cfg.get("grid", {}).get("dz_um", "n/a"))
+                cfg = reference_data.get("config", {})
+                c1, c2, c3 = st.columns(3)
+                c1.metric("b", cfg.get("material", {}).get("b", "n/a"))
+                c2.metric("bi", cfg.get("material", {}).get("bi", "n/a"))
+                c3.metric("dz (µm)", cfg.get("grid", {}).get("dz_um", "n/a"))
 
-            if st.button("Validate selected reference case"):
-                with st.spinner("Running trusted reference validation..."):
-                    try:
-                        ref_result = run_reference_case(selected_reference)
-                    except Exception as exc:
-                        st.error("Trusted reference validation failed")
-                        st.exception(exc)
+                if st.button("Validate selected reference case"):
+                    with st.spinner("Running trusted reference validation..."):
+                        try:
+                            ref_result = run_reference_case(selected_reference)
+                        except Exception as exc:
+                            st.error("Trusted reference validation failed or is unavailable")
+                            st.exception(exc)
+                        else:
+                            st.success("Trusted reference validation passed")
+                            if isinstance(ref_result, dict):
+                                st.json(ref_result)
+
+                show_trusted_config = st.checkbox(
+                    "Show trusted config",
+                    value=False,
+                    key="show_trusted_config",
+                )
+
+                if show_trusted_config:
+                    st.json(cfg)
+
+                show_reference_json = st.checkbox(
+                    "Show full reference JSON",
+                    value=False,
+                    key="show_reference_json",
+                )
+
+                if show_reference_json:
+                    st.json(reference_data)
+
+                if st.button("Show reference figures"):
+                    figures = reference_data.get("figures", {})
+                    xz_png = Path(figures.get("xz_reference", ""))
+                    centroid_png = Path(figures.get("centroid_reference", ""))
+
+                    if xz_png.exists():
+                        st.image(Image.open(xz_png), caption="xz intensity reference")
                     else:
-                        st.success("Trusted reference validation passed")
-                        if isinstance(ref_result, dict):
-                            st.json(ref_result)
-            show_trusted_config = st.checkbox(
-                "Show trusted config",
-                value=False,
-                key="show_trusted_config",
-            )
+                        st.info("No xz reference image found.")
 
-            if show_trusted_config:
-                st.json(cfg)
-
-            show_reference_json = st.checkbox(
-                "Show full reference JSON",
-                value=False,
-                key="show_reference_json",
-            )
-
-            if show_reference_json:
-                st.json(reference_data)
-
-            if st.button("Show reference figures"):
-                figures = reference_data.get("figures", {})
-                xz_png = Path(figures.get("xz_reference", ""))
-                centroid_png = Path(figures.get("centroid_reference", ""))
-
-                if xz_png.exists():
-                    st.image(Image.open(xz_png), caption="xz intensity reference")
-                else:
-                    st.info("No xz reference image found.")
-
-                if centroid_png.exists():
-                    st.image(Image.open(centroid_png), caption="x centroid drift reference")
-                else:
-                    st.info("No centroid reference image found.")
+                    if centroid_png.exists():
+                        st.image(Image.open(centroid_png), caption="x centroid drift reference")
+                    else:
+                        st.info("No centroid reference image found.")
