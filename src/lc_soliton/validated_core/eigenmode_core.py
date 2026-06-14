@@ -869,12 +869,6 @@ def lc_eigensoliton_existence_curve_v2(
                 print(f"[checkpoint] wrote {state_path}")
 
 
-
-
-
-
-
-
             if live_plot and ((j + 1) % live_plot_every == 0):
                 plot_eigensoliton_core(
                     row,
@@ -1336,10 +1330,21 @@ def read_profile_summary(profile_path):
             "path": Path(profile_path),
             "P_mW": _npz_scalar(z, "P_mW", np.nan),
             "bi": _npz_scalar(z, "bi", np.nan),
+            "b": _npz_scalar(z, "b", np.nan),
+            "theta_bc": _npz_scalar(z, "theta_bc", np.nan),
             "beta": _npz_scalar(z, "beta", np.nan),
             "grid_mode": _npz_string(z, "grid_mode", "LEGACY"),
             "branch": _npz_string(z, "branch", "LEGACY"),
         }
+        try:
+            out["A_shape"] = tuple(z["A"].shape)
+        except KeyError:
+                out["A_shape"] = None
+            
+        try:
+            out["theta_shape"] = tuple(z["theta"].shape)
+        except KeyError:
+            out["theta_shape"] = None
     finally:
         z.close()
     return out
