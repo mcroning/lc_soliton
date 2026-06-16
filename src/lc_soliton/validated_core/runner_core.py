@@ -18,6 +18,41 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+try:
+    import numba as nb
+    _HAS_NUMBA = True
+except Exception:
+    nb = None
+    _HAS_NUMBA = False
+
+if _HAS_NUMBA:
+    @nb.njit(parallel=True, cache=True)
+    def _thomas_batched_numba(a, bvec, c, rhs):
+        B, n = rhs.shape
+        x = np.empty_like(rhs)
+
+        for j in nb.prange(B):
+            bj = bvec[j]
+
+            cpv = np.empty(n, dtype=np.complex64)
+            dpv = np.empty(n, dtype=np.complex64)
+
+            denom = np.complex64(bj)
+            cpv[0] = np.complex64(c) / denom
+            dpv[0] = rhs[j, 0] / denom
+
+            for i in range(1, n):
+                denom = np.complex64(bj) - np.complex64(a) * cpv[i - 1]
+                cpv[i] = np.complex64(c) / denom if i < n - 1 else np.complex64(0.0)
+                dpv[i] = (rhs[j, i] - np.complex64(a) * dpv[i - 1]) / denom
+
+            x[j, n - 1] = dpv[n - 1]
+            for i in range(n - 2, -1, -1):
+                x[j, i] = dpv[i] - cpv[i] * x[j, i + 1]
+
+        return x
+else:
+    _thomas_batched_numba = None
 import numpy as np
 from lc_soliton.core.backend import xp_default as cp
 
@@ -48,6 +83,7 @@ except Exception:  # pragma: no cover
 j = 1j
 
 from .launch_core import build_theta_bias_IC, build_theta_bias_IC_dirichlet_value, compute_n_bg_from_bias, genrot, build_amp_pair
+
 
 def _is_numpy_backend_array(a):
     return a.__class__.__module__.split(".")[0] == "numpy"
@@ -191,6 +227,9 @@ def _lam_y_periodic_second_diff(Ny, dv, xp=cp):
     k = xp.arange(Ny, dtype=xp.float32)
     return (-4.0 * xp.sin(xp.pi * k / Ny)**2) / (dv * dv)
 
+
+
+
 def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
     B, n = d_hatB.shape
 
@@ -202,11 +241,19 @@ def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
 
         rhs = np.asarray(d_hatB, dtype=np.complex64)
         B, n = rhs.shape
-
         b = np.asarray(bvec, dtype=np.float32)
 
-        x = np.empty_like(rhs)
+        if b.ndim > 0 and b.size == B and _thomas_batched_numba is not None:
+            x = _thomas_batched_numba(
+                np.float32(a),
+                b.astype(np.float32, copy=False),
+                np.float32(c),
+                rhs,
+            )
+            return cp.asarray(x, dtype=cp.complex64)
 
+        # universal SciPy fallback
+        x = np.empty_like(rhs)
         for j in range(B):
             bj = float(b[j]) if b.ndim > 0 and b.size == B else float(b)
 
