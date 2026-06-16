@@ -28,6 +28,33 @@ __all__ = [
     "_prepare_legacy_plans",
     "_prepare_substeps",
 ]
+def _fft2(xp, a, axes=(-2, -1)):
+    return xp.fft.fft2(a, axes=axes)
+
+
+def _ifft2(xp, a, axes=(-2, -1)):
+    return xp.fft.ifft2(a, axes=axes)
+
+def _compute_h_local(ctx: LCContext, dz_um: float):
+    key = round(float(dz_um), 12)
+    if key in ctx._h_cache:
+        return ctx._h_cache[key]
+    xp = ctx.xp
+    lm = float(ctx.p.wavelength_um)
+    refin = float(ctx.refin)
+    arg = 1.0 - (lm / refin) ** 2 * ctx.fxy2
+    h = xp.where(arg > 0, xp.exp(2j * xp.pi * refin * dz_um / lm * xp.sqrt(xp.maximum(arg, 0))), 0)
+    ctx._h_cache[key] = h.astype(xp.complex64)
+    return ctx._h_cache[key]
+
+def _hop_linear_local(ctx: LCContext, amp, h):
+    xp = ctx.xp
+    A = _fft2(xp, amp, axes=(-2, -1))
+    A *= h
+    out = _ifft2(xp, A, axes=(-2, -1)).astype(xp.complex64)
+    if ctx.windowxy is not None:
+        out *= ctx.windowxy[None, :, :]
+    return out
 
 def normalize_info(info: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(info or {})

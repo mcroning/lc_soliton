@@ -121,13 +121,25 @@ def hop_linear(amp, hker, windowxy=None):
     return amp
 
 def hop_linear_inplace(amp, hker, windowxy, Ahat, *, plan_f, plan_i):
-    with plan_f:
-        Ahat[...] = spfft.fft2(amp, axes=(-2, -1))
-    Ahat *= hker
-    with plan_i:
-        amp[...] = spfft.ifft2(Ahat, axes=(-2, -1))
+    if plan_f is None:
+        A = spfft.fft2(amp, axes=(-2, -1))
+    else:
+        with plan_f:
+            A = spfft.fft2(amp, axes=(-2, -1))
+
+    A *= hker
+
+    if plan_i is None:
+        out = spfft.ifft2(A, axes=(-2, -1))
+    else:
+        with plan_i:
+            out = spfft.ifft2(A, axes=(-2, -1))
+
+    amp[...] = out.astype(cp.complex64, copy=False)
+
     if windowxy is not None:
         amp *= windowxy
+
     return amp
 
 def lc_dn_from_theta(theta, ne, no, refin):

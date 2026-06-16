@@ -152,9 +152,22 @@ def run_lc_validated(
     use_legacy_td = _HAS_CUPY and xp is _cupy and mode == "td_predictor_only"
     use_legacy_dg_td = False
     if mode == "strict_static" and not use_legacy_static:
-        raise RuntimeError(
-            "Validated strict_static currently requires CuPy/GPU. "
-            "CPU physics execution is not validated yet."
+        cpu_demo_ok = (
+            xp is not _cupy
+            and int(params.Nx) <= 128
+            and int(params.Ny) <= 128
+            and int(params.Nz) <= 50
+        )
+
+        if not cpu_demo_ok:
+            raise RuntimeError(
+                "Validated strict_static requires CuPy/GPU for production runs. "
+                "CPU demo mode is limited to Nx<=128, Ny<=128, Nz<=50."
+            )
+
+        print(
+            "[CPU demo mode] strict_static enabled for small grid only:",
+            f"Nx={params.Nx}, Ny={params.Ny}, Nz={params.Nz}",
         )
 
     if mode in {"strict_static", "td_predictor_only"} and not (_HAS_CUPY and xp is _cupy):

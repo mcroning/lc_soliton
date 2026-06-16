@@ -1,9 +1,21 @@
 """
-Archived CPU smoke numerics.
-
 These routines are preserved for future CPU validation work but are not used
 by the validated engine. Do not import into production paths without tests.
 """
+from __future__ import annotations
+
+from typing import Any, Dict
+
+import numpy as np
+
+from lc_soliton.core.backend import _HAS_CUPY, _cupy, asnumpy
+from lc_soliton.physics.lc.bias import compute_neff
+from lc_soliton.core.launch import intensity
+#from lc_soliton.validated_core.residual_core import (
+#    lc_residual64,
+#    residual_stats_2d,
+#    normalize_info,
+#)
 
 # -----------------------------------------------------------------------------
 # Local package-smoke fallback numerics
@@ -104,8 +116,8 @@ def _simple_static_smoke_slice(ctx, amp, theta_seed, *, nsub: int, dz_sub: float
     )
     return theta, I_mid, amp_out, info
 
-
-def _make_scalar_info_from_residual(theta, I_mid, ctx) -> Dict[str, Any]:
-    R = lc_residual64(theta, I_mid, b=ctx.b, bi=ctx.bi, du=ctx.du, dv=ctx.dv, mobility=ctx.mobility)
-    stats = residual_stats_2d(R)
-    return normalize_info(dict(rrms=stats["rms_interior"], rmax=stats["max_interior"], converged=True))
+if False:
+    def _make_scalar_info_from_residual(theta, I_mid, ctx) -> Dict[str, Any]:
+        R = lc_residual64(theta, I_mid, b=ctx.b, bi=ctx.bi, du=ctx.du, dv=ctx.dv, mobility=ctx.mobility)
+        stats = residual_stats_2d(R)
+        return normalize_info(dict(rrms=stats["rms_interior"], rmax=stats["max_interior"], converged=True))

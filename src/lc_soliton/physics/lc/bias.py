@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import numpy as np
 import math
 from lc_soliton.core.backend import xp_default as cp, asnumpy
 import scipy.special as spspec
