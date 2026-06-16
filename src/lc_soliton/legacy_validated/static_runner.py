@@ -20,8 +20,7 @@ from .runner_utils import (
     residual_quality_info,
     _hop_linear_local,
 )
-from lc_soliton.core.backend import _HAS_CUPY, _cupy
-from lc_soliton.validated_core.cpu_demo import _simple_static_smoke_slice
+
 def _run_static(
     *,
     ctx: LCContext,
@@ -36,16 +35,19 @@ def _run_static(
     nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(ctx, params, use_core=use_legacy_static)
     plans = _prepare_legacy_plans(ctx) if use_legacy_static else LegacyPlans()
 
-    if use_legacy_static:
-        plans.sS, plans.offS, plans.diagS, plans.lamS = prepare_cn_ky_operator(
-            dt=float(params.dtau_static),
-            mobility=float(ctx.mobility),
-            du=float(ctx.du),
-            dv=float(ctx.dv),
-            Ny=int(ctx.Ny),
-        )
+    plans.sS, plans.offS, plans.diagS, plans.lamS = prepare_cn_ky_operator(
+        dt=float(params.dtau_static),
+        mobility=float(ctx.mobility),
+        du=float(ctx.du),
+        dv=float(ctx.dv),
+        Ny=int(ctx.Ny),
+    )
 
-    amp = core_hop_linear(ctx.amp0.copy(), h_half, ctx.windowxy) if use_legacy_static else _hop_linear_local(ctx, ctx.amp0.copy(), h_half)
+    amp = (
+        core_hop_linear(ctx.amp0.copy(), h_half, ctx.windowxy)
+        if use_legacy_static
+        else _hop_linear_local(ctx, ctx.amp0.copy(), h_half)
+    )
     stopped = False
 
     for k in range(ctx.Nz):
@@ -59,40 +61,32 @@ def _run_static(
     
         tp = ctx.theta_full[k - 1] if k > 0 else ctx.theta_full[k]
         tn = ctx.theta_full[k + 1] if (k + 1) < ctx.Nz else ctx.theta_full[k]
-        if _HAS_CUPY and ctx.xp is _cupy:
-            theta, I_mid, amp, info = strict_static_relax_slice_selfconsistent(
-                amp,
-                theta_seed,
-                tp,
-                tn,
-                ctx,
-                dz_sub=float(dz_sub),
-                Nsub=int(nsub),
-                h_sub=h_sub,
-                Ahat=plans.Ahat,
-                plan_f=plans.plan_f,
-                plan_i=plans.plan_i,
-                sS=plans.sS,
-                offS=plans.offS,
-                diagS=plans.diagS,
-                lamS=plans.lamS,
-                use_linear_seed=True,
-                early_accept_linear_seed=True,
-                residual_tol_max=float(params.static_tol_max),
-                residual_tol_rms=float(params.static_tol_rms),
-                max_outer_passes=8,
-                max_selfcons_passes=int(params.static_selfcons_passes),
-                selfcons_tol_theta=1e-4,
-            )
-        else:
-            theta, I_mid, amp, info = _simple_static_smoke_slice(
-                ctx,
-                amp,
-                theta_seed,
-                nsub=int(nsub),
-                dz_sub=float(dz_sub),
-                h_sub=h_sub,
-            )
+
+        theta, I_mid, amp, info = strict_static_relax_slice_selfconsistent(
+            amp,
+            theta_seed,
+            tp,
+            tn,
+            ctx,
+            dz_sub=float(dz_sub),
+            Nsub=int(nsub),
+            h_sub=h_sub,
+            Ahat=plans.Ahat,
+            plan_f=plans.plan_f,
+            plan_i=plans.plan_i,
+            sS=plans.sS,
+            offS=plans.offS,
+            diagS=plans.diagS,
+            lamS=plans.lamS,
+            use_linear_seed=True,
+            early_accept_linear_seed=True,
+            residual_tol_max=float(params.static_tol_max),
+            residual_tol_rms=float(params.static_tol_rms),
+            max_outer_passes=8,
+            max_selfcons_passes=int(params.static_selfcons_passes),
+            selfcons_tol_theta=1e-4,
+        )
+
     
         info = normalize_info(info)
     

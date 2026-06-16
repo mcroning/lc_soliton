@@ -201,15 +201,23 @@ def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
         from scipy.linalg import solve_banded
 
         rhs = np.asarray(d_hatB, dtype=np.complex64)
+        B, n = rhs.shape
 
         b = np.asarray(bvec, dtype=np.float32)
-        ab = np.zeros((3, n), dtype=np.complex64)
-        ab[0, 1:] = np.complex64(c)      # upper diagonal
-        ab[1, :] = b.astype(np.complex64)
-        ab[2, :-1] = np.complex64(a)     # lower diagonal
 
-        xT = solve_banded((1, 1), ab, rhs.T)
-        return cp.asarray(xT.T, dtype=cp.complex64)
+        x = np.empty_like(rhs)
+
+        for j in range(B):
+            bj = float(b[j]) if b.ndim > 0 and b.size == B else float(b)
+
+            ab = np.zeros((3, n), dtype=np.complex64)
+            ab[0, 1:] = np.complex64(c)
+            ab[1, :] = np.complex64(bj)
+            ab[2, :-1] = np.complex64(a)
+
+            x[j, :] = solve_banded((1, 1), ab, rhs[j, :])
+
+        return cp.asarray(x, dtype=cp.complex64)
 
     d_hatB = cp.ascontiguousarray(d_hatB.astype(cp.complex64, copy=False))
     x = cp.empty_like(d_hatB)

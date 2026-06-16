@@ -95,8 +95,8 @@ def _simple_static_smoke_slice(ctx, amp, theta_seed, *, nsub: int, dz_sub: float
 
     # Use a very conservative explicit relaxation. This exists only so CPU tests
     # can exercise IO/request plumbing; trusted static uses validated_core on GPU.
-    dtau = min(float(p.dtau_static), 1e-5)
-    for _ in range(max(1, min(int(p.static_max_steps), 20))):
+    dtau = min(float(p.dtau_static), 2e-6)
+    for _ in range(max(1, min(int(p.static_max_steps), 200))):
         R = _residual_local(theta, I_b, ctx)
         theta[1:-1, :] += xp.float32(dtau) * R[1:-1, :]
         theta = xp.clip(theta, p.theta_clamp_min, p.theta_clamp_max).astype(xp.float32)
