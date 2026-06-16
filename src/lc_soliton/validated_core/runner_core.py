@@ -19,16 +19,25 @@ from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
-import cupy as cp
-import cupyx.scipy.fft as spfft
-from cupyx.scipy.ndimage import gaussian_filter
+from lc_soliton.core.backend import xp_default as cp
 
+try:
+    import cupyx.scipy.fft as spfft
+except ImportError:
+    import scipy.fft as spfft
+
+try:
+    from cupyx.scipy.ndimage import gaussian_filter
+except ImportError:
+    from scipy.ndimage import gaussian_filter
+try:
+    from lc_soliton.legacy_validated.lc_offload_tools import _thomas_kernel
+except Exception:
+    _thomas_kernel = None
 import scipy.special as spspec
 from scipy.optimize import root_scalar
 from scipy.signal.windows import tukey
 from scipy.ndimage import zoom as sp_zoom
-
-from lc_soliton.legacy_validated.lc_offload_tools import _thomas_kernel
 
 try:
     from tqdm.auto import tqdm
@@ -39,6 +48,26 @@ except Exception:  # pragma: no cover
 j = 1j
 
 from .launch_core import build_theta_bias_IC, build_theta_bias_IC_dirichlet_value, compute_n_bg_from_bias, genrot, build_amp_pair
+
+def _is_numpy_backend_array(a):
+    return a.__class__.__module__.split(".")[0] == "numpy"
+
+def _thomas_cpu_solve_banded(lower, diag, upper, rhs):
+    import numpy as np
+    from scipy.linalg import solve_banded
+
+    lower = np.asarray(lower)
+    diag = np.asarray(diag)
+    upper = np.asarray(upper)
+    rhs = np.asarray(rhs)
+
+    n = diag.size
+    ab = np.zeros((3, n), dtype=rhs.dtype)
+    ab[0, 1:] = upper[:-1]
+    ab[1, :] = diag
+    ab[2, :-1] = lower[1:]
+
+    return solve_banded((1, 1), ab, rhs)
 
 def prepare_ie_ky_operator(*, dt, mobility, du, dv, Ny):
     a_ie = float(dt) / float(mobility)
@@ -152,12 +181,32 @@ def _lam_y_periodic_second_diff(Ny, dv, xp=cp):
 
 def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
     B, n = d_hatB.shape
+
+    # CPU fallback: d_hatB shape is (B, n), each row is one RHS.
+    # scipy solve_banded expects RHS columns, so solve transposed.
+    if _thomas_kernel is None:
+        import numpy as np
+        from scipy.linalg import solve_banded
+
+        rhs = np.asarray(d_hatB, dtype=np.complex64)
+
+        b = np.asarray(bvec, dtype=np.float32)
+        ab = np.zeros((3, n), dtype=np.complex64)
+        ab[0, 1:] = np.complex64(c)      # upper diagonal
+        ab[1, :] = b.astype(np.complex64)
+        ab[2, :-1] = np.complex64(a)     # lower diagonal
+
+        xT = solve_banded((1, 1), ab, rhs.T)
+        return cp.asarray(xT.T, dtype=cp.complex64)
+
     d_hatB = cp.ascontiguousarray(d_hatB.astype(cp.complex64, copy=False))
     x = cp.empty_like(d_hatB)
     cprime = cp.empty_like(d_hatB)
     dprime = cp.empty_like(d_hatB)
+
     threads = 128
     blocks = (B + threads - 1) // threads
+
     _thomas_kernel(
         (blocks,), (threads,),
         (
@@ -169,12 +218,10 @@ def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
             cprime.view(cp.float32).reshape(B, n, 2),
             dprime.view(cp.float32).reshape(B, n, 2),
             cp.int32(B),
-            cp.int32(n)
-        )
+            cp.int32(n),
+        ),
     )
     return x
-
-
 
 def strict_static_relax_slice_selfconsistent(
     amp_in,

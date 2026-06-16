@@ -10,7 +10,7 @@ try:
 except Exception:  # pragma: no cover
     _cupy = None
     _HAS_CUPY = False
-
+xp_default = _cupy if _HAS_CUPY else np
 
 def get_backend(name="auto", verbose=True):
     if name in ("numpy", "cpu"):
@@ -91,6 +91,7 @@ def free_backend_memory(xp) -> None:
 __all__ = [
     "_HAS_CUPY",
     "_cupy",
+    "xp_default",
     "get_backend",
     "is_cupy_array",
     "asnumpy",

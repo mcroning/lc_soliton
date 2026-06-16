@@ -19,9 +19,15 @@ from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
-import cupy as cp
-import cupyx.scipy.fft as spfft
-from cupyx.scipy.ndimage import gaussian_filter
+from lc_soliton.core.backend import xp_default as cp
+try:
+    import cupyx.scipy.fft as spfft
+except ImportError:
+    import scipy.fft as spfft
+try:
+    from cupyx.scipy.ndimage import gaussian_filter
+except ImportError:
+    from scipy.ndimage import gaussian_filter
 
 import scipy.special as spspec
 from scipy.optimize import root_scalar

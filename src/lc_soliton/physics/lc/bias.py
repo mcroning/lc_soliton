@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import math
-import numpy as np
-import cupy as cp
+from lc_soliton.core.backend import xp_default as cp, asnumpy
 import scipy.special as spspec
-
 __all__ = [
     "compute_neff",
     "compute_n_bg_from_bias",
@@ -259,7 +257,7 @@ def build_theta_bias_IC(
 
     theta0 = xp.arcsin(xp.sqrt(m))
     arg = xp.sqrt(2.0 * b) * u
-    _, cn_cpu, dn_cpu, _ = spspec.ellipj(cp.asnumpy(arg), float(m))
+    _, cn_cpu, dn_cpu, _ = spspec.ellipj(asnumpy(arg), float(m))
 
     cn = xp.asarray(cn_cpu)
     dn = xp.asarray(dn_cpu)
@@ -368,7 +366,7 @@ def build_theta_bias_IC_dirichlet_value(
 
     arg = xp.sqrt(two_b) * u
 
-    arg_cpu = cp.asnumpy(arg)
+    arg_cpu = asnumpy(arg)
 
     _, cn_cpu, dn_cpu, _ = spspec.ellipj(arg_cpu, float(m))
 
@@ -557,7 +555,7 @@ def theta_bias_1d_exact_zero_bc(Nx, b, *, xp=cp, dtype=None):
     th[-1] = 0.0
 
     if xp is np:
-        out = cp.asnumpy(th).astype(dtype, copy=False)
+        out = asnumpy(th).astype(dtype, copy=False)
         out[0] = 0.0
         out[-1] = 0.0
         return out
