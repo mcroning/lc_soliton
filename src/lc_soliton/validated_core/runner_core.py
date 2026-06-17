@@ -157,26 +157,29 @@ def hop_linear(amp, hker, windowxy=None):
     return amp
 
 def hop_linear_inplace(amp, hker, windowxy, Ahat, *, plan_f, plan_i):
-    if plan_f is None:
-        A = spfft.fft2(amp, axes=(-2, -1))
-    else:
-        with plan_f:
+    
+        if plan_f is None:
             A = spfft.fft2(amp, axes=(-2, -1))
+        else:
+            with plan_f:
+                A = spfft.fft2(amp, axes=(-2, -1))
 
-    A *= hker
+        A *= hker
 
-    if plan_i is None:
-        out = spfft.ifft2(A, axes=(-2, -1))
-    else:
-        with plan_i:
+        if plan_i is None:
             out = spfft.ifft2(A, axes=(-2, -1))
+        else:
+            with plan_i:
+                out = spfft.ifft2(A, axes=(-2, -1))
 
-    amp[...] = out.astype(cp.complex64, copy=False)
+        amp[...] = out.astype(cp.complex64, copy=False)
 
-    if windowxy is not None:
-        amp *= windowxy
+        if windowxy is not None:
+            amp *= windowxy
 
-    return amp
+        return amp
+
+    
 
 def lc_dn_from_theta(theta, ne, no, refin):
     th64 = theta.astype(cp.float64, copy=False)
@@ -232,9 +235,9 @@ def _lam_y_periodic_second_diff(Ny, dv, xp=cp):
 
 def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
     B, n = d_hatB.shape
-
     # CPU fallback: d_hatB shape is (B, n), each row is one RHS.
     # scipy solve_banded expects RHS columns, so solve transposed.
+    
     if _thomas_kernel is None:
         import numpy as np
         from scipy.linalg import solve_banded
@@ -289,7 +292,7 @@ def thomas_batched_const_tridiag(a, bvec, c, d_hatB):
         ),
     )
     return x
-
+    
 def strict_static_relax_slice_selfconsistent(
     amp_in,
     theta_seed,

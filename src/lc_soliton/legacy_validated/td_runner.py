@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from ..core.backend import _HAS_CUPY, _cupy, asnumpy, free_backend_memory
-from ..core.context import LCContext, LCParams, DualGrid
+from ..core.context import LCContext, LCParams, DualGrid, LegacyPlans
 from ..core.storage import LightStore
 from ..core.launch import intensity
 from ..core.dual_grid import restrict_block_mean, prolong_repeat
@@ -14,6 +14,7 @@ from ..validated_core.runner_core import (
     hop_linear as core_hop_linear,
     intens_into,
     prepare_ie_ky_operator,
+    prepare_cn_ky_operator,
     td_get_slice_mid_intensity,
     td_update_theta_from_midintensity,
     lc_residual64,
@@ -57,12 +58,25 @@ def _run_td_predictor(
     progress: Optional[Callable[[str], None]],
     should_stop: Optional[Callable[[], bool]],
 ) -> bool:
-    if not (_HAS_CUPY and ctx.xp is _cupy):
-        raise RuntimeError("Validated TD predictor currently requires CuPy/GPU.")
+    cpu_td = not (_HAS_CUPY and ctx.xp is _cupy)
+    if cpu_td:
+        print(
+            "[CPU TD experimental mode] validated TD predictor running on NumPy/SciPy backend."
+        )
 
     xp = ctx.xp
-    nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(ctx, params, use_core=True)
-    plans = _prepare_legacy_plans(ctx)
+    nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(
+        ctx, params, use_core=not cpu_td
+    )
+    plans = _prepare_legacy_plans(ctx) if not cpu_td else LegacyPlans()
+
+    plans.sS, plans.offS, plans.diagS, plans.lamS = prepare_cn_ky_operator(
+        dt=float(params.dtau_static),
+        mobility=float(ctx.mobility),
+        du=float(ctx.du),
+        dv=float(ctx.dv),
+        Ny=int(ctx.Ny),
+    )
 
     # Buffers used by validated_core TD predictor/corrector path.
     ctx._amp_in_buf = xp.empty_like(ctx.amp0)

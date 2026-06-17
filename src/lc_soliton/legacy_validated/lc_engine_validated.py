@@ -152,27 +152,17 @@ def run_lc_validated(
     use_legacy_td = _HAS_CUPY and xp is _cupy and mode == "td_predictor_only"
     use_legacy_dg_td = False
     if mode == "strict_static" and not use_legacy_static:
-        cpu_demo_ok = (
-            xp is not _cupy
-            and int(params.Nx) <= 128
-            and int(params.Ny) <= 128
-            and int(params.Nz) <= 50
-        )
-
-        if not cpu_demo_ok:
-            raise RuntimeError(
-                "Validated strict_static requires CuPy/GPU for production runs. "
-                "CPU demo mode is limited to Nx<=128, Ny<=128, Nz<=50."
-            )
-
         print(
-            "[CPU demo mode] strict_static enabled for small grid only:",
-            f"Nx={params.Nx}, Ny={params.Ny}, Nz={params.Nz}",
+            "[CPU static mode] strict_static running on NumPy/SciPy backend:",
+            f"Nx={params.Nx}, Ny={params.Ny}, Nz={params.Nz}.",
+            "This path uses the CPU CN/Thomas fallback and may be slower than GPU.",
         )
-
     if mode in {"strict_static", "td_predictor_only"} and not (_HAS_CUPY and xp is _cupy):
         if mode == "td_predictor_only":
-            raise RuntimeError("Validated TD predictor requires CuPy/GPU. Use backend='auto' on a GPU node.")
+            print(
+                "[CPU TD experimental mode] td_predictor_only running on NumPy/SciPy backend. "
+                "This path is not yet validated against GPU TD."
+            )
 
     Nt_eff = int(Nt) if mode in {"td_predictor_only", "dg_td_predictor"} else 1
     t_stride = max(1, int(t_stride))
@@ -220,6 +210,7 @@ def run_lc_validated(
                 use_legacy_static=use_legacy_static,
                 save_full=save_full,
             )
+            
         elif mode == "td_predictor_only":
             stopped = _run_td_predictor(
                 ctx=ctx,

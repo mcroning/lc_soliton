@@ -1412,19 +1412,18 @@ else:
                             st.session_state[frame_key] = int(nframes - 1)
 
                     if nframes == 1:
-                        frame = 0
+                        st.session_state[frame_key] = 0
                         st.caption("Single-frame dataset")
                     else:
-                        frame = st.slider(
-                            "Frame",
+                        st.slider(
+                            "Movie frame",
                             min_value=0,
                             max_value=int(nframes - 1),
-                            value=int(st.session_state[frame_key]),
-                            key=f"{movie_name}_frame_slider",
+                            key=frame_key,
                         )
-                        st.session_state[frame_key] = int(frame)
 
                     frame = int(st.session_state[frame_key])
+
 
                     arr = np.memmap(
                         movie_path,
