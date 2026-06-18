@@ -76,7 +76,7 @@ if _RUNNING_STREAMLIT:
     _thomas_kernel = None
 else:
     try:
-        from lc_soliton.legacy_validated.lc_offload_tools import _thomas_kernel
+        from lc_soliton.validated_core.thomas import _thomas_kernel
     except Exception:
         _thomas_kernel = None
 
