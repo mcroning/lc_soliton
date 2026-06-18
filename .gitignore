@@ -27,3 +27,6 @@ runs/
 *.pyc
 Eigenmode LC_generator_V3p4.ipynb
 small_runs/
+
+scalene-profile.html
+scalene-profile.json
