@@ -10,8 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from .legacy_validated.lc_engine_validated import LCParams, run_lc_validated
-from .environment import write_environment_json
+from .core.context import LCParams
 
 
 def run_dg_td(
@@ -26,23 +25,16 @@ def run_dg_td(
     progress: Callable[[str], None] | None = print,
 ) -> dict[str, Any]:
     """
-    Run a validated dual-grid time-dependent LC propagation calculation.
+    Run dual-grid time-dependent LC propagation.
+
+    This workflow is intentionally disabled while it is rebuilt on top of the
+    cleaned TD runner.
     """
-    result = run_lc_validated(
-        params,
-        run_dir=run_dir,
-        mode="dg_td_predictor",
-        Nt=Nt,
-        dt=dt,
-        t_stride=t_stride,
-        save_slices=save_slices,
-        save_full=save_full,
-        progress=progress,
+    raise NotImplementedError(
+        "Dual-grid TD is being rebuilt on top of the cleaned TD runner. "
+        "The old dg_td_predictor path was experimental and is intentionally "
+        "not exposed as the production dual-grid runner."
     )
-
-    write_environment_json(run_dir)
-
-    return result
 
 
 __all__ = [
