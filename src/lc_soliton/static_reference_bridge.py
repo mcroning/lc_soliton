@@ -1,6 +1,12 @@
 """
 Faithful wrapper for the legacy strict static z-march bridge used to
 generate the stored trusted reference case.
+
+Legacy-only reference bridge.
+
+This module intentionally imports lc_offload_tools to reproduce the original
+trusted strict-static reference path. It is not used by the active static
+runner.
 """
 
 from __future__ import annotations
