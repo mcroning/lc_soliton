@@ -92,7 +92,7 @@ result = run_eigensoliton_existence_curve(
     save_profiles=True,
     progress_callback=progress,
 solve_kwargs=dict(
-    max_outer=80,
+    max_outer=160,
     theta_residual_tol_rms=5e-3,
     theta_residual_tol_max=5e-2,
 ),
