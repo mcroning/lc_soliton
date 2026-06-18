@@ -13,7 +13,7 @@ def list_eigensoliton_profiles(run_dir: str | Path) -> list[dict]:
     """
     List saved eigensoliton profiles in a run directory.
     """
-    from .legacy_validated.lc_offload_tools import list_run_profiles
+    from .validated_core.eigenmode_core import list_run_profiles
 
     return list_run_profiles(Path(run_dir))
 
@@ -22,10 +22,9 @@ def load_eigensoliton_profile(profile_path: str | Path) -> dict:
     """
     Load a saved eigensoliton profile dictionary.
     """
-    from .legacy_validated.lc_offload_tools import load_saved_mode_profile
+    from .validated_core.eigenmode_core import load_saved_mode_profile
 
     return load_saved_mode_profile(Path(profile_path))
-
 
 __all__ = [
     "list_eigensoliton_profiles",
