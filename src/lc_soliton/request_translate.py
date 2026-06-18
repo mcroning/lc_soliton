@@ -67,6 +67,7 @@ def request_to_lcparams_kwargs(request):
         "static_selfcons_passes": request.solver.static_selfcons_passes,
         "static_mix": request.solver.static_mix,
         "backend": request.runtime.backend,
+        
     }
 
 def legacy_params_to_request_dict(data: dict) -> dict:
@@ -159,6 +160,7 @@ def legacy_params_to_request_dict(data: dict) -> dict:
         "static_tol_max",
         "static_selfcons_passes",
         "static_mix",
+        "strict_max_outer_passes",
     ):
         if k in params:
             solver[k] = params.pop(k)

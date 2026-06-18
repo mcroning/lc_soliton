@@ -129,7 +129,19 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
         )
 
         if mode == "static":
-            result = run_static(params, **common_kwargs)
+            print(
+                "[engine] strict_max_outer_passes =",
+                request.solver.strict_max_outer_passes,
+            )
+
+            result = run_static(
+                params,
+                strict_max_outer_passes=int(
+                    request.solver.strict_max_outer_passes
+                ),
+                **common_kwargs,
+            )
+
             _add_request_metadata(request.output.run_dir)
             return result
 

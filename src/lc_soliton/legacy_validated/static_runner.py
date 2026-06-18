@@ -30,6 +30,7 @@ def _run_static(
     should_stop: Optional[Callable[[], bool]],
     use_legacy_static: bool,
     save_full: bool,
+    strict_max_outer_passes: int = 8,
 ) -> bool:
     xp = ctx.xp
     nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(ctx, params, use_core=use_legacy_static)
@@ -61,7 +62,7 @@ def _run_static(
     
         tp = ctx.theta_full[k - 1] if k > 0 else ctx.theta_full[k]
         tn = ctx.theta_full[k + 1] if (k + 1) < ctx.Nz else ctx.theta_full[k]
-
+        print("[static_runner] strict_max_outer_passes =", strict_max_outer_passes)
         theta, I_mid, amp, info = strict_static_relax_slice_selfconsistent(
             amp,
             theta_seed,
@@ -82,7 +83,7 @@ def _run_static(
             early_accept_linear_seed=True,
             residual_tol_max=float(params.static_tol_max),
             residual_tol_rms=float(params.static_tol_rms),
-            max_outer_passes=8,
+            max_outer_passes=int(strict_max_outer_passes),
             max_selfcons_passes=int(params.static_selfcons_passes),
             selfcons_tol_theta=1e-4,
         )
@@ -110,10 +111,53 @@ def _run_static(
             or (k + 1) % max(1, ctx.Nz // 20) == 0
             or k == ctx.Nz - 1
         ):
+            
+            if (k % 10) == 0:
+                print(
+                    "relax_rms=", info.get("relax_rms"),
+                    "rms=", info.get("rms_interior"),
+                    "max=", info.get("max_interior"),
+                    "niter=", info.get("niter"),
+                    "outer=", info.get("n_outer_passes"),
+                )
+            rrms = float(info.get("rrms", info.get("rms_interior", np.nan)))
+            rmax = float(info.get("rmax", info.get("max_interior", np.nan)))
+
+            tol_rms = float(getattr(params, "static_tol_rms", np.inf))
+            tol_max = float(getattr(params, "static_tol_max", np.inf))
+
+            solver_ok = bool(info.get("converged", False))
+            rms_ok = rrms <= tol_rms
+            max_ok = rmax <= tol_max
+
+            solver_ok = bool(info.get("converged", False))
+            rms_ratio = rrms / max(tol_rms, 1e-30)
+
+            if not solver_ok:
+                status = "FAIL:solver"
+
+            elif rms_ratio > 10.0:
+                status = "FAIL:rms"
+
+            elif rms_ratio > 1.0:
+                status = "WARN:rms"
+
+            elif not max_ok:
+                status = "WARN:max"
+
+            else:
+                status = "OK"
+
+            niter = int(info.get("niter", -1))
+            max_steps = int(info.get("max_steps", getattr(ctx, "static_max_steps", -1)))
+            outer = int(info.get("n_outer_passes", -1))
+
             progress(
                 f"static z {k+1}/{ctx.Nz}  "
                 f"Imax={float(asnumpy(xp.max(I_mid))):.3e}  "
-                f"Rrms={float(info.get('rrms', np.nan)):.3e}"
+                f"Rrms={rrms:.3e}  "
+                f"Rmax={rmax:.3e}  "
+                f"[{status} outer={outer} relax={niter}/{max_steps}]"
             )
     
     return stopped

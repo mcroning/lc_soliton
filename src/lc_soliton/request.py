@@ -99,6 +99,7 @@ class SolverRequest:
     static_tol_max: float = 0.01
     static_selfcons_passes: int = 3
     static_mix: float = 0.6
+    strict_max_outer_passes: int = 8
 
 
 

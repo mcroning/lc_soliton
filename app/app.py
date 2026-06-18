@@ -414,7 +414,7 @@ with st.expander("Browse folders", expanded=False):
 
     st.write(f"Current: `{current}`")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     with c1:
         if st.button("⬆ Parent", key="mini_parent"):
@@ -439,6 +439,11 @@ with st.expander("Browse folders", expanded=False):
             st.session_state["last_run_dir"] = str(current)
             st.session_state["last_result"] = {}
             st.session_state["last_metadata"] = {}
+            st.rerun()
+
+    with c6:
+        if st.button("Use as eigensoliton folder", key="mini_use_profile"):
+            st.session_state["pending_profile_run_dir"] = str(current)
             st.rerun()
 
     child_dirs = list_child_dirs(current)
@@ -606,7 +611,7 @@ with col_bias:
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width="stretch")
 
 st.sidebar.header("Launch source")
 
@@ -682,6 +687,9 @@ if launch_source == "Load saved run as template":
     coherent = st.session_state.get("coherent", False)
 
 elif launch_source == "Use saved eigensoliton profile":
+    if "pending_profile_run_dir" in st.session_state:
+        st.session_state["profile_run_dir"] = st.session_state.pop("pending_profile_run_dir")
+
     profile_run_dir = sb_text(
         "Eigensoliton run folder",
         "profile_run_dir",
@@ -777,6 +785,7 @@ with st.sidebar.expander("Advanced solver parameters"):
     init_state_default("dz_opt_max_phi", 0.3)
     init_state_default("dn_max_est", 0.02)
     init_state_default("max_substeps", 16)
+    init_state_default("strict_max_outer_passes", 8)
     dtau_static = st.number_input("dtau_static", format="%.6g", key="dtau_static")
     static_tol_rms = st.number_input("static_tol_rms", format="%.6g", key="static_tol_rms")
     static_tol_max = st.number_input("static_tol_max", format="%.6g", key="static_tol_max")
@@ -786,6 +795,15 @@ with st.sidebar.expander("Advanced solver parameters"):
         step=1,
         key="static_selfcons_passes",
     )
+    
+    strict_max_outer_passes = st.number_input(
+        "strict_max_outer_passes",
+        min_value=1,
+        max_value=50,
+        step=1,
+        key="strict_max_outer_passes",
+    )
+
     static_mix = st.number_input("static_mix", format="%.6g", key="static_mix")
     dz_opt_max_phi = st.number_input("dz_opt_max_phi", format="%.6g", key="dz_opt_max_phi")
     dn_max_est = st.number_input("dn_max_est", format="%.6g", key="dn_max_est")
@@ -982,6 +1000,7 @@ if run_button:
                 dz_opt_max_phi=float(dz_opt_max_phi),
                 dn_max_est=float(dn_max_est),
                 max_substeps=int(max_substeps),
+                strict_max_outer_passes=int(strict_max_outer_passes),
             ),
 
             output=OutputRequest(
@@ -1083,7 +1102,10 @@ if run_button:
         "theta_bc=", theta_bc_request,
     )
 
-
+    print(
+        "[app] strict_max_outer_passes =",
+        strict_max_outer_passes,
+    )
 
     request = SimulationRequest(
         mode=selected_mode,
@@ -1135,6 +1157,7 @@ if run_button:
             dz_opt_max_phi=float(dz_opt_max_phi),
             dn_max_est=float(dn_max_est),
             max_substeps=int(max_substeps),
+            strict_max_outer_passes=int(strict_max_outer_passes),
         ),
         output=OutputRequest(
             run_dir=str(run_dir),

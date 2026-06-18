@@ -23,6 +23,7 @@ def run_static(
     save_full: bool = False,
     progress: Callable[[str], None] | None = print,
     should_stop: Callable[[], bool] | None = None,
+    strict_max_outer_passes: int = 8,
 ) -> dict[str, Any]:
     """
     Run a validated strict-static LC propagation calculation.
@@ -45,6 +46,7 @@ def run_static(
     dict
         Run metadata and lightweight result information.
     """
+    print("[static.py] strict_max_outer_passes =", strict_max_outer_passes)
     result = run_lc_validated(
         params,
         run_dir=run_dir,
@@ -54,6 +56,7 @@ def run_static(
         save_full=save_full,
         progress=progress,
         should_stop=should_stop,
+        strict_max_outer_passes=int(strict_max_outer_passes),
     )
 
     write_environment_json(run_dir)

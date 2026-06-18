@@ -102,6 +102,7 @@ def run_lc_validated(
     save_full: bool = False,
     progress: Optional[Callable[[str], None]] = print,
     should_stop: Optional[Callable[[], bool]] = None,
+    strict_max_outer_passes: int = 8,
 ) -> Dict[str, Any]:
     t0 = time.time()
     mode = mode.lower().strip()
@@ -185,8 +186,8 @@ def run_lc_validated(
             dz_sub=dz_sub_meta,
             phi_est=phi_meta,
             backend="cupy" if (_HAS_CUPY and xp is _cupy) else "numpy",
-            strict_static_kernel="validated_core" if use_legacy_static else "package_smoke",
-            td_kernel="validated_core" if use_legacy_td else "package_smoke",
+            strict_static_kernel="validated_core_gpu" if use_legacy_static else "validated_core_cpu",
+            td_kernel="validated_core_gpu" if use_legacy_td else "validated_core_cpu",
             dg_td_kernel=(
                 "experimental_dual_grid"
                 if use_legacy_dg_td
@@ -201,6 +202,7 @@ def run_lc_validated(
     stopped = False
     try:
         if mode in {"static_fast", "strict_static"}:
+            print("[lc_engine_validated] strict_max_outer_passes =", strict_max_outer_passes)
             stopped = _run_static(
                 ctx=ctx,
                 params=params,
@@ -209,6 +211,7 @@ def run_lc_validated(
                 should_stop=should_stop,
                 use_legacy_static=use_legacy_static,
                 save_full=save_full,
+                strict_max_outer_passes=int(strict_max_outer_passes),
             )
             
         elif mode == "td_predictor_only":

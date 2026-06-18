@@ -25,6 +25,10 @@ except Exception:
     nb = None
     _HAS_NUMBA = False
 
+import sys
+
+_RUNNING_STREAMLIT = any("streamlit" in arg.lower() for arg in sys.argv)
+
 if _HAS_NUMBA:
     @nb.njit(parallel=True, cache=True)
     def _thomas_batched_numba(a, bvec, c, rhs):
@@ -53,6 +57,7 @@ if _HAS_NUMBA:
         return x
 else:
     _thomas_batched_numba = None
+
 import numpy as np
 from lc_soliton.core.backend import xp_default as cp
 
@@ -65,10 +70,17 @@ try:
     from cupyx.scipy.ndimage import gaussian_filter
 except ImportError:
     from scipy.ndimage import gaussian_filter
-try:
-    from lc_soliton.legacy_validated.lc_offload_tools import _thomas_kernel
-except Exception:
+
+
+if _RUNNING_STREAMLIT:
     _thomas_kernel = None
+else:
+    try:
+        from lc_soliton.legacy_validated.lc_offload_tools import _thomas_kernel
+    except Exception:
+        _thomas_kernel = None
+
+
 import scipy.special as spspec
 from scipy.optimize import root_scalar
 from scipy.signal.windows import tukey
@@ -416,10 +428,21 @@ def strict_static_relax_slice_selfconsistent(
         ):
             converged = True
             break
+    final_converged = (
+        bool(converged)
+        and last_info is not None
+        and last_info["max_interior"] <= float(residual_tol_max)
+        and last_info["rms_interior"] <= float(residual_tol_rms)
+    )
 
     return theta, I_mid, amp_work, {
-        "converged": converged,
+        "converged": final_converged,
         "n_selfcons_passes": sc_pass + 1,
+        "n_outer_passes": last_info.get("n_outer_passes", -1),
+        "niter": last_info.get("niter", -1),
+        "max_steps": last_info.get("max_steps", int(getattr(ctx, "static_max_steps", -1))),
+        "relax_converged": last_info.get("relax_converged", False),
+        "relax_rms": last_info.get("relax_rms", None),
         "max_interior": last_info["max_interior"],
         "rms_interior": last_info["rms_interior"],
     }
@@ -1246,8 +1269,11 @@ def _static_relax_to_resid_zcoupled(theta_seed, Ixy, theta_prev, theta_next, ctx
     resid_every = int(getattr(ctx, "static_resid_every", 10))
     tol = float(getattr(ctx, "static_tol_resid", 0.08))
     omega = float(getattr(ctx, "static_relax_omega", 0.3))
-
+    converged_relax = False
+    niter = 0
+    last_rloc = None
     for it in range(max_steps):
+        niter = it+1
         th_new = advance_theta_timestep_cn_trap_picard_prepared_zcoupled(
             th,
             dt=float(ctx.dtau_static),
@@ -1280,10 +1306,17 @@ def _static_relax_to_resid_zcoupled(theta_seed, Ixy, theta_prev, theta_next, ctx
 
         if (it % resid_every) == 0 or it == (max_steps - 1):
             rloc = _slice_residual_rms_local3d_z(th, I32, theta_prev, theta_next, ctx, gamma_z)
+            last_rloc = float(rloc)
             if rloc < tol:
+                converged_relax = True
                 break
 
-    return th
+    return th, {
+        "niter": int(niter),
+        "max_steps": int(max_steps),
+        "relax_converged": bool(converged_relax),
+        "relax_rms": last_rloc,
+    }
 
 def strict_static_relax_slice(
     theta_seed, I_mid, tp, tn, ctx, *,
@@ -1328,17 +1361,23 @@ def strict_static_relax_slice(
                 "n_outer_passes": 0,
                 "max_interior": stats0["max_interior"],
                 "rms_interior": stats0["rms_interior"],
+                "niter": 0,
+                "max_steps": int(getattr(ctx, "static_max_steps", -1)),
+                "relax_converged": True,
+                "relax_rms": stats0["rms_interior"],
             }
 
     history_max = []
     history_rms = []
     converged = False
+    relax_info = {}
 
     for outer in range(max_outer_passes):
-        theta = _static_relax_to_resid_zcoupled(
+        theta, relax_info = _static_relax_to_resid_zcoupled(
             theta, I_mid, tp, tn, ctx,
             sS=sS, offS=offS, diagS=diagS, lamS=lamS
-        ).astype(cp.float32, copy=False)
+        )
+        theta = theta.astype(cp.float32, copy=False)
 
         if ctx.theta_clamp is not None:
             theta = cp.clip(theta, cp.float32(ctx.theta_clamp[0]), cp.float32(ctx.theta_clamp[1]))
@@ -1366,6 +1405,10 @@ def strict_static_relax_slice(
     return theta, {
         "converged": converged,
         "n_outer_passes": outer + 1,
+        "niter": relax_info.get("niter", -1),
+        "max_steps": relax_info.get("max_steps", int(getattr(ctx, "static_max_steps", -1))),
+        "relax_converged": relax_info.get("relax_converged", False),
+        "relax_rms": relax_info.get("relax_rms", None),
         "max_interior": history_max[-1],
         "rms_interior": history_rms[-1],
     }

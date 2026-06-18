@@ -21,7 +21,7 @@ from typing import Any
 import pandas as pd
 import numpy as np
 from lc_soliton.core.backend import xp_default as cp
-
+from lc_soliton.core.backend import asnumpy
 try:
     import cupyx.scipy.fft as spfft
 except ImportError:
@@ -102,7 +102,7 @@ def _json_safe(v):
     if isinstance(v, np.ndarray):
         return v.tolist()
     if isinstance(v, cp.ndarray):
-        return cp.asnumpy(v).tolist()
+        return asnumpy(v).tolist()
     if isinstance(v, (list, tuple)):
         return [_json_safe(x) for x in v]
     if isinstance(v, dict):
@@ -902,8 +902,8 @@ def lc_eigensoliton_existence_curve_v2(
                     )
                     break
 
-            cp.get_default_memory_pool().free_all_blocks()
-            gc.collect()
+                if hasattr(cp, "get_default_memory_pool"):
+                    cp.get_default_memory_pool().free_all_blocks()
 
     except KeyboardInterrupt:
         print("\n[interrupt] Caught KeyboardInterrupt. Returning completed points.")
@@ -965,12 +965,12 @@ def live_plot_eigensoliton_profile(row, I, theta, ctx, *, every=1):
     Live profile plot after each completed power point.
     I, theta are CuPy arrays.
     """
-    Icpu = cp.asnumpy(I)
-    thcpu = cp.asnumpy(theta - ctx.theta_bias_2d)
+    Icpu = asnumpy(I)
+    thcpu = asnumpy(theta - ctx.theta_bias_2d)
 
     x_um, y_um = xy_um_from_ctx(ctx)
-    x = cp.asnumpy(x_um)
-    y = cp.asnumpy(y_um)
+    x = asnumpy(x_um)
+    y = asnumpy(y_um)
 
     extent = [y[0], y[-1], x[0], x[-1]]
 
@@ -1015,12 +1015,12 @@ def plot_eigensoliton_core(row, I, theta, ctx, zoom_um=5.0, clear=True):
     if clear:
         clear_output(wait=True)
 
-    I_cpu = cp.asnumpy(I)
-    th_cpu = cp.asnumpy(theta - ctx.theta_bias_2d)
+    I_cpu = asnumpy(I)
+    th_cpu = asnumpy(theta - ctx.theta_bias_2d)
 
     x_um_cp, y_um_cp = xy_um_from_ctx(ctx)
-    x_um = cp.asnumpy(x_um_cp)
-    y_um = cp.asnumpy(y_um_cp)
+    x_um = asnumpy(x_um_cp)
+    y_um = asnumpy(y_um_cp)
 
     ix, iy = np.unravel_index(np.argmax(I_cpu), I_cpu.shape)
     x0 = x_um[ix]
@@ -1113,7 +1113,7 @@ def verify_saved_profile_beta(
     try:
         A = z["A"]
         theta = z["theta"]
-        beta_saved = float(cp.asnumpy(z["beta"]).ravel()[0])
+        beta_saved = float(asnumpy(z["beta"]).ravel()[0])
 
         beta_symbol, _ = make_beta_symbol_from_ctx(ctx, subtract_carrier=subtract_carrier)
         beta_check = rayleigh_beta(ctx, A, beta_symbol, theta)
@@ -1309,22 +1309,27 @@ def load_repro_json(run_dir, checkpoint_prefix="lc_eigensoliton"):
     with open(path, "r") as f:
         return json.load(f)
 
-def _npz_keys(z):
-    return set(z.npz_file.files)
-
 def _npz_scalar(z, key, default=None):
     if key not in _npz_keys(z):
         return default
-    return float(cp.asnumpy(z[key]).ravel()[0])
+
+    return float(asnumpy(z[key]).ravel()[0])
+
+def _npz_keys(z):
+    if hasattr(z, "files"):
+        return set(z.files)
+    if hasattr(z, "npz_file"):
+        return set(z.npz_file.files)
+    return set()
 
 def _npz_string(z, key, default="LEGACY"):
-    keys = _npz_keys(z)
-    if key not in keys:
+    if key not in _npz_keys(z):
         return default
 
-    # String arrays should be read from the underlying NumPy npz file,
-    # not through CuPy, because CuPy does not support unicode dtype <U.
-    v = z.npz_file[key]
+    if hasattr(z, "files"):
+        v = z[key]
+    else:
+        v = z.npz_file[key]
 
     try:
         return str(v.item())
@@ -1920,7 +1925,7 @@ def solve_lc_optical_eigensoliton_dg(
 
 def polish_from_DG(ctx, prdata, dg, profile_path, *, n_outer=8):
     prof = cp.load(profile_path)
-    keys = set(prof.npz_file.files)
+    keys = set(prof.files) if hasattr(prof, "files") else set(prof.npz_file.files)
 
     A = prof["A"].astype(cp.complex64, copy=True)
 
@@ -1942,7 +1947,7 @@ def polish_from_DG(ctx, prdata, dg, profile_path, *, n_outer=8):
     # switch to full grid
     ctx.use_dual_grid = False
 
-    beta = float(cp.asnumpy(prof["beta"]).ravel()[0])
+    beta = float(asnumpy(prof["beta"]).ravel()[0])
 
     for outer in range(n_outer):
         A_old = A.copy()
