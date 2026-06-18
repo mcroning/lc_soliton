@@ -16,7 +16,6 @@ __all__ = [
 
     # backend / execution
     "get_backend",
-    "run_lc_validated",
     "run_static",
     "run_td",
     "run_dg_td",
@@ -61,7 +60,7 @@ def __getattr__(name):
         from .config import RunConfig
         return RunConfig
 
-    if name in {"LCParams", "get_backend", "run_lc_validated"}:
+    if name in {"LCParams", "get_backend"}:
         from . import runners
         return getattr(runners, name)
 
