@@ -32,6 +32,12 @@ def run_td(
     progress: Callable[[str], None] | None = print,
     should_stop: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
+    """
+    Run a validated predictor-only time-dependent LC propagation calculation.
+
+    This public entry point builds the LC context, prepares storage/metadata,
+    and calls the TD workflow runner directly.
+    """
     t0 = time.time()
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
