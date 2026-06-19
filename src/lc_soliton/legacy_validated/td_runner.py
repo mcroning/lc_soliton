@@ -19,6 +19,7 @@ from ..validated_core.runner_core import (
     td_update_theta_from_midintensity,
     lc_residual64,
     residual_stats_2d,
+    make_coarse_theta_ctx
 )
 
 
@@ -33,6 +34,69 @@ __all__ = [
     "_run_td_predictor",
     "_run_dg_td_experimental",
 ]
+
+class IdentityThetaGrid:
+    """
+    Adapter for the ordinary full-grid TD case.
+
+    This makes full-grid TD the identity special case of the future
+    dual-grid TD path.
+    """
+
+    def __init__(self, ctx: LCContext):
+        self.ctx_theta = ctx
+        self.theta_stack = ctx.theta_full
+
+    def snapshot(self):
+        return self.theta_stack.copy()
+
+    def theta_for_optics(self, theta_k):
+        return theta_k
+
+    def restrict_I(self, I_full):
+        return I_full
+
+    def store_theta(self, k: int, theta_new):
+        self.theta_stack[k] = theta_new
+        return theta_new
+
+class DualGridThetaGrid:
+    def __init__(self, ctx, dg):
+        self.ctx_full = ctx
+        self.dg = dg
+        self.ctx_theta = make_coarse_theta_ctx(ctx, factor=dg.factor)
+
+        xp = ctx.xp
+        self.theta_stack = xp.stack(
+            [dg.theta_bias_c.copy() for _ in range(ctx.Nz)],
+            axis=0,
+        )
+
+    def snapshot(self):
+        return self.theta_stack.copy()
+
+    def theta_for_optics(self, theta_c):
+        return prolong_repeat(
+            theta_c,
+            self.dg.factor,
+            target_shape=(self.ctx_full.Nx, self.ctx_full.Ny),
+            xp=self.ctx_full.xp,
+        )
+
+    def restrict_I(self, I_full):
+        return restrict_block_mean(
+            I_full,
+            self.dg.factor,
+            xp=self.ctx_full.xp,
+        )
+
+    def store_theta(self, k, theta_c_new):
+        self.theta_stack[k] = theta_c_new
+
+        theta_f = self.theta_for_optics(theta_c_new)
+        self.ctx_full.theta_full[k] = theta_f
+
+        return theta_f
 
 def _make_scalar_info_from_residual(theta, I_mid, ctx) -> dict:
     R = lc_residual64(
@@ -50,6 +114,7 @@ def _make_scalar_info_from_residual(theta, I_mid, ctx) -> dict:
 def _run_td_predictor(
     *,
     ctx: LCContext,
+    dg: DualGrid | None = None,
     params: LCParams,
     store: LightStore,
     Nt: int,
@@ -64,18 +129,26 @@ def _run_td_predictor(
             "[CPU TD experimental mode] validated TD predictor running on NumPy/SciPy backend."
         )
 
-    xp = ctx.xp
+        xp = ctx.xp
     nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(
         ctx, params, use_core=not cpu_td
     )
     plans = _prepare_legacy_plans(ctx) if not cpu_td else LegacyPlans()
 
+    theta_grid = (
+        DualGridThetaGrid(ctx, dg)
+        if dg is not None
+        else IdentityThetaGrid(ctx)
+    )
+    print("[TD] theta grid adapter =", type(theta_grid).__name__)
+    theta_ctx = theta_grid.ctx_theta
+
     plans.sS, plans.offS, plans.diagS, plans.lamS = prepare_cn_ky_operator(
         dt=float(params.dtau_static),
-        mobility=float(ctx.mobility),
-        du=float(ctx.du),
-        dv=float(ctx.dv),
-        Ny=int(ctx.Ny),
+        mobility=float(theta_ctx.mobility),
+        du=float(theta_ctx.du),
+        dv=float(theta_ctx.dv),
+        Ny=int(theta_ctx.Ny),
     )
 
     # Buffers used by validated_core TD predictor/corrector path.
@@ -86,22 +159,24 @@ def _run_td_predictor(
     stopped = False
     Nt_eff = int(Nt)
 
+
+
     for jt in range(Nt_eff):
         if should_stop is not None and should_stop():
             stopped = True
             if progress:
                 progress("run stopped by user")
             break
-
+        theta_ctx = theta_grid.ctx_theta
         a_ie, offTD, diagTD, lam_yTD = prepare_ie_ky_operator(
             dt=float(dt),
-            mobility=float(ctx.mobility),
-            du=float(ctx.du),
-            dv=float(ctx.dv),
-            Ny=int(ctx.Ny),
+            mobility=float(theta_ctx.mobility),
+            du=float(theta_ctx.du),
+            dv=float(theta_ctx.dv),
+            Ny=int(theta_ctx.Ny),
         )
 
-        theta_ref = ctx.theta_full.copy()
+        theta_ref = theta_grid.snapshot()
         amp = core_hop_linear(ctx.amp0.copy(), h_half, ctx.windowxy)
         slot = jt // max(1, int(t_stride))
         last_Imax = np.nan
@@ -115,6 +190,7 @@ def _run_td_predictor(
                 break
 
             theta_old = theta_ref[k]
+            theta_opt = theta_grid.theta_for_optics(theta_old)
             tp = theta_ref[k - 1] if k > 0 else theta_old
             tn = theta_ref[k + 1] if k + 1 < ctx.Nz else theta_old
 
@@ -127,7 +203,7 @@ def _run_td_predictor(
             amp = td_get_slice_mid_intensity(
                 ctx,
                 amp,
-                theta_old,
+                theta_opt,
                 I_b,
                 I_a,
                 I_mid,
@@ -139,13 +215,13 @@ def _run_td_predictor(
                 plan_i=plans.plan_i,
                 frozen_I_mid_k=None,
             )
-
+            I_mid_theta = theta_grid.restrict_I(I_mid)
             theta = td_update_theta_from_midintensity(
-                ctx,
+                theta_grid.ctx_theta,
                 theta_old,
                 tp,
                 tn,
-                I_mid,
+                I_mid_theta,
                 dt_j=float(dt),
                 true_td=True,
                 a_ie=a_ie,
@@ -163,12 +239,29 @@ def _run_td_predictor(
                 plan_f=plans.plan_f,
                 plan_i=plans.plan_i,
             )
+            theta_save = theta_grid.store_theta(k, theta)
+            if k == 0 and jt == 0:
+                print(
+                    "[TD residual debug]",
+                    "theta_save", getattr(theta_save, "shape", None),
+                    "I_mid", getattr(I_mid, "shape", None),
+                    "ctx", ctx.Nx, ctx.Ny,
+                    "theta_grid", type(theta_grid).__name__,
+                )
 
-            ctx.theta_full[k] = theta
-            info = _make_scalar_info_from_residual(theta, I_mid, ctx)
+
+            
+            if isinstance(theta_grid, DualGridThetaGrid):
+                info = _make_scalar_info_from_residual(
+                    theta,
+                    I_mid_theta,
+                    theta_grid.ctx_theta,
+                )
+            else:
+                info = _make_scalar_info_from_residual(theta_save, I_mid, ctx)
 
             if (jt % max(1, int(t_stride))) == 0:
-                store.save(slot, k, I_mid, theta, info)
+                store.save(slot, k, I_mid, theta_save, info)
 
             last_Imax = float(asnumpy(xp.max(I_mid)))
             last_rrms = float(info.get("rrms", np.nan))

@@ -6,7 +6,6 @@ from __future__ import annotations
 from pathlib import Path
 from .static import run_static
 from .timedependent import run_td
-from .dualgrid import run_dg_td
 from .legacy_validated.lc_engine_validated import LCParams
 from .request import SimulationRequest
 
@@ -14,19 +13,16 @@ from .request import SimulationRequest
 ENGINE_MODES = {
     "static": run_static,
     "time_dependent": run_td,
-    "time_dependent_dual_grid": run_dg_td,
 }
 
 LEGACY_ENGINE_MODE_ALIASES = {
     "strict_static": "static",
     "td_predictor_only": "time_dependent",
-    "dg_td_predictor": "time_dependent_dual_grid",
 }
 
 ENGINE_MODE_DESCRIPTIONS = {
     "static": "Static self-consistent propagation",
     "time_dependent": "Time-dependent evolution",
-    "time_dependent_dual_grid": "Time-dependent evolution using dual-grid director solve",
 }
 
 
@@ -61,8 +57,6 @@ def _add_request_metadata(run_dir: str | Path) -> None:
 
 def available_engine_modes(include_experimental: bool = False):
     modes = ["static", "time_dependent"]
-    if include_experimental:
-        modes.append("time_dependent_dual_grid")
     return modes
 
 
@@ -145,10 +139,7 @@ def run_engine(mode_or_request, *args, progress_callback=None, **kwargs):
             _add_request_metadata(request.output.run_dir)
             return result
 
-        if mode in (
-            "time_dependent",
-            "time_dependent_dual_grid",
-        ):
+        if mode == "time_dependent":
             result = ENGINE_MODES[mode](
                 params,
                 Nt=request.solver.Nt,

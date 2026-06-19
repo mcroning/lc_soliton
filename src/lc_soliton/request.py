@@ -15,7 +15,6 @@ from typing import Any, Literal
 EngineMode = Literal[
     "static",
     "time_dependent",
-    "time_dependent_dual_grid",
 ]
 
 
@@ -82,6 +81,8 @@ class GridRequest:
     Nx: int = 512
     Ny: int = 512
     Nz: int = 100
+    use_dual_grid: bool = False
+    dual_grid_factor: int = 2
 
 @dataclass
 class SolverRequest:

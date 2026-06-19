@@ -260,7 +260,6 @@ def normalize_gui_mode(mode):
     aliases = {
         "strict_static": "static",
         "td_predictor_only": "time_dependent",
-        "dg_td_predictor": "time_dependent_dual_grid",
     }
     return aliases.get(mode, mode)
 
@@ -275,7 +274,6 @@ mode_descriptions = describe_engine_modes()
 mode_labels = {
     "static": "Static",
     "time_dependent": "Time Dependent",
-    "time_dependent_dual_grid": "Time Dependent (Dual Grid)",
 }
 
 # Apply a template request before any widgets are instantiated.
@@ -293,10 +291,8 @@ display_mode_labels = {
     "strict_static": "Static",
     "time_dependent": "Time Dependent",
     "td_predictor_only": "Time Dependent",
-    "time_dependent_dual_grid": "Time Dependent (Dual Grid)",
-    "dg_td_predictor": "Time Dependent (Dual Grid)",
 }
-#from streamlit_file_browser import st_file_browser
+
 
 
 
@@ -766,15 +762,34 @@ static_max_steps = sb_number(
     min_value=1,
     step=1,
 )
-
-if selected_mode in {"time_dependent", "time_dependent_dual_grid"}:
+st.sidebar.caption(f"DEBUG selected_mode={selected_mode!r}")
+if selected_mode == "time_dependent":
     Nt = sb_number("Time steps", "Nt", 100, min_value=1, step=1)
     dt = sb_number("dt", "dt", 5e-4, format="%.6g")
     t_stride = sb_number("Output stride", "t_stride", 1, min_value=1, step=1)
+
+    use_dual_grid = sb_checkbox(
+        "Dual-grid director solve",
+        key="use_dual_grid",
+        help="Optics stays on the full grid; the LC director is solved on a coarser grid.",
+    )
+
+    if use_dual_grid:
+        dual_grid_factor = st.sidebar.selectbox(
+            "Director grid coarsening",
+            [2, 4, 8],
+            index=0,
+            key="dual_grid_factor",
+            help="Coarsening factor for the LC director grid. Nx and Ny must be divisible by this.",
+        )
+    else:
+        dual_grid_factor = 1
 else:
     Nt = 1
     dt = 5e-4
     t_stride = 1
+    use_dual_grid = False
+    dual_grid_factor = 1
 
 with st.sidebar.expander("Advanced solver parameters"):
     init_state_default("dtau_static", 0.01)
@@ -952,7 +967,13 @@ if run_button:
 
         request = SimulationRequest(
             mode="strict_static",
-            grid=GridRequest(Nx=int(Nx), Ny=int(Ny), Nz=int(Nz)),
+            grid=GridRequest(
+                Nx=int(Nx),
+                Ny=int(Ny),
+                Nz=int(Nz),
+                use_dual_grid=False,
+                dual_grid_factor=1,
+            ),
             geometry=GeometryRequest(
                 xaper_um=float(xaper_um),
                 yaper_um=float(yaper_um),
@@ -1109,7 +1130,13 @@ if run_button:
 
     request = SimulationRequest(
         mode=selected_mode,
-        grid=GridRequest(Nx=int(Nx_request), Ny=int(Ny_request), Nz=int(Nz)),
+        grid=GridRequest(
+            Nx=int(Nx_request),
+            Ny=int(Ny_request),
+            Nz=int(Nz),
+            use_dual_grid=bool(use_dual_grid),
+            dual_grid_factor=int(dual_grid_factor),
+        ),
         geometry=GeometryRequest(
             xaper_um=float(xaper_um),
             yaper_um=float(yaper_um),

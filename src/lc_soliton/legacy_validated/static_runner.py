@@ -62,7 +62,7 @@ def _run_static(
     
         tp = ctx.theta_full[k - 1] if k > 0 else ctx.theta_full[k]
         tn = ctx.theta_full[k + 1] if (k + 1) < ctx.Nz else ctx.theta_full[k]
-        print("[static_runner] strict_max_outer_passes =", strict_max_outer_passes)
+        
         theta, I_mid, amp, info = strict_static_relax_slice_selfconsistent(
             amp,
             theta_seed,

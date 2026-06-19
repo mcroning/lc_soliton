@@ -3,7 +3,7 @@ try:
     import cupy as cp
 except Exception:
     cp = None
- if cp is not None:   
+if cp is not None:   
     _thomas_kernel = cp.RawKernel(r'''
 
 

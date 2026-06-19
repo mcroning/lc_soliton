@@ -26,6 +26,8 @@ def request_to_lcparams_kwargs(request):
         "Nx": request.grid.Nx,
         "Ny": request.grid.Ny,
         "Nz": request.grid.Nz,
+        "use_dual_grid": bool(getattr(request.grid, "use_dual_grid", False)),
+        "dual_grid_factor": int(getattr(request.grid, "dual_grid_factor", 1)),
 
         "xaper_um": request.geometry.xaper_um,
         "yaper_um": request.geometry.yaper_um,
