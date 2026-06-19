@@ -129,7 +129,7 @@ def _run_td_predictor(
     
     if cpu_td:
         print(
-            "[CPU TD experimental mode] validated TD predictor running on NumPy/SciPy backend."
+            "[CPU TD mode] validated TD predictor running on NumPy/SciPy backend."
         )
     nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(
         ctx, params, use_core=not cpu_td
@@ -241,16 +241,6 @@ def _run_td_predictor(
                 plan_i=plans.plan_i,
             )
             theta_save = theta_grid.store_theta(k, theta)
-            if k == 0 and jt == 0:
-                print(
-                    "[TD residual debug]",
-                    "theta_save", getattr(theta_save, "shape", None),
-                    "I_mid", getattr(I_mid, "shape", None),
-                    "ctx", ctx.Nx, ctx.Ny,
-                    "theta_grid", type(theta_grid).__name__,
-                )
-
-
             
             if isinstance(theta_grid, DualGridThetaGrid):
                 info = _make_scalar_info_from_residual(

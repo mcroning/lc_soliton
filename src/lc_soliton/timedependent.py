@@ -43,13 +43,7 @@ def run_td(
     run_dir.mkdir(parents=True, exist_ok=True)
 
     ctx, dg = make_context(params)
-###
-    print("use_dual_grid =", getattr(params, "use_dual_grid", None))
-    print("dual_grid_factor =", getattr(params, "dual_grid_factor", None))
-    print("dg =", dg)
-    if dg is not None:
-        print("DG factor/shape =", dg.factor, dg.Nx_c, dg.Ny_c)
-###
+
     xp = ctx.xp
     apply_legacy_context_aliases(ctx, params)
 
@@ -101,8 +95,6 @@ def run_td(
 
     with open(run_dir / "metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
-    print("use_dual_grid =", getattr(params, "use_dual_grid", None))
-    print("dual_grid_factor =", getattr(params, "dual_grid_factor", None))
     stopped = False
     try:
         stopped = _run_td_predictor(
