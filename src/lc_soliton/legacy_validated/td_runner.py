@@ -123,13 +123,14 @@ def _run_td_predictor(
     progress: Optional[Callable[[str], None]],
     should_stop: Optional[Callable[[], bool]],
 ) -> bool:
-    cpu_td = not (_HAS_CUPY and ctx.xp is _cupy)
+    xp = ctx.xp
+    
+    cpu_td = not (_HAS_CUPY and xp is _cupy)
+    
     if cpu_td:
         print(
             "[CPU TD experimental mode] validated TD predictor running on NumPy/SciPy backend."
         )
-
-        xp = ctx.xp
     nsub, dz_sub, phi, h_sub, h_half = _prepare_substeps(
         ctx, params, use_core=not cpu_td
     )
