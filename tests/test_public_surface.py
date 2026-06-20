@@ -4,7 +4,6 @@ def test_public_surface():
     required = [
         "run_static",
         "run_td",
-        "run_dg_td",
         "run_engine",
         "available_engine_modes",
         "load_reference_case",

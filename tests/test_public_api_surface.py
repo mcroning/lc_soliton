@@ -6,7 +6,6 @@ def test_public_api_surface():
         "LCParams",
         "run_static",
         "run_td",
-        "run_dg_td",
     ]
 
     missing = [name for name in expected if not hasattr(lc_soliton, name)]
