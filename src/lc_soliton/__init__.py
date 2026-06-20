@@ -18,7 +18,6 @@ __all__ = [
     "get_backend",
     "run_static",
     "run_td",
-    "run_dg_td",
     "run_engine",
     "available_engine_modes",
     "describe_engine_modes",
@@ -71,10 +70,6 @@ def __getattr__(name):
     if name == "run_td":
         from .timedependent import run_td
         return run_td
-
-    if name == "run_dg_td":
-        from .dualgrid import run_dg_td
-        return run_dg_td
 
     if name == "load_run":
         from .runs import load_run
