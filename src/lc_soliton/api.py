@@ -9,4 +9,3 @@ from .static import *
 from .timedependent import *
 from .io import *
 from .runs import *
-from .diagnostics import *
