@@ -607,7 +607,7 @@ with col_bias:
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
-    st.pyplot(fig, width="stretch")
+    st.pyplot(fig)
 
 st.sidebar.header("Launch source")
 

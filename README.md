@@ -2,38 +2,55 @@
 
 Liquid-crystal optical soliton simulation tools.
 
-This package preserves and organizes validated research code for:
-- static LC propagation
-- time-dependent LC relaxation
-- eigensoliton / existence-curve calculations
-- stability diagnostics
-- run loading and reproducibility
+The package supports:
 
-The initial package intentionally imports validated code with minimal refactoring.
+- static self-consistent optical propagation
+- time-dependent liquid-crystal evolution
+- optional dual-grid acceleration
+- eigensoliton and existence-curve workflows
+- stability analysis
+- reproducible run storage
+- Streamlit GUI operation
 
-## Current status
+## Quick Start
 
-This repository currently wraps a validated legacy LC simulation engine
-with minimal numerical changes.
+New users should begin with:
 
-The immediate goals are:
-- preservation
-- reproducibility
-- packaging
-- documentation
-- regression testing
+    docs/Quick_Start.md
 
-before deeper refactoring.
+Documentation index:
+
+    docs/index.md
+
+## Current Status
+
+The package is suitable for internal research use and active development.
+
+Current strengths include:
+
+- installable package
+- Streamlit GUI
+- static and time-dependent solvers
+- dual-grid acceleration
+- reference-case validation
+- reproducible run storage
+
+Active development continues on:
+
+- existence-curve workflow polish
+- stability-analysis workflow polish
+- high-power static convergence
+- documentation and usability improvements
 
 ## Installation
 
     pip install -e ".[dev]"
 
-## Quick test
+## Quick Test
 
     lc-soliton --summary
 
-## Reference validation
+## Reference Validation
 
 Check that the installed package reproduces the trusted strict-static benchmark:
 
@@ -51,7 +68,6 @@ The current recommended public entry points are:
         LCParams,
         run_static,
         run_td,
-        run_dg_td,
         load_run,
     )
 
@@ -63,19 +79,9 @@ Example:
     params = LCParams(Nx=64, Ny=64, Nz=8)
     result = run_static(params, run_dir=Path("runs/example"))
 
-Legacy validated internals remain available during the transition, but new
-user-facing scripts should prefer the public API above.
+New user-facing scripts should prefer the public API.
 
-## Reference validation
-
-A stored strict-static reference case can be checked with:
-
-    lc-soliton --validate-reference
-
-This verifies trusted convergence and residual metrics for the first packaged
-physics regression case.
-
-## Run output directory
+## Run Output Directory
 
 By default, generated outputs go under:
 
@@ -85,7 +91,7 @@ You can override this with:
 
     export LC_SOLITON_RUN_ROOT=/path/to/run/storage
 
-## Run provenance metadata
+## Run Provenance Metadata
 
 Public runners automatically save:
 
@@ -94,6 +100,7 @@ Public runners automatically save:
 inside each run directory.
 
 This records:
+
 - lc_soliton version
 - Python version
 - NumPy/SciPy versions
@@ -103,3 +110,11 @@ This records:
 - timestamp
 
 This helps with reproducibility and debugging.
+
+## Documentation
+
+    docs/Quick_Start.md
+    docs/gui.md
+    docs/public_api.md
+    docs/eigensoliton_profiles.md
+    docs/theory.md
