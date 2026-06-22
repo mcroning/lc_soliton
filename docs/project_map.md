@@ -1,46 +1,94 @@
-# Project map
+# Project Map
 
-## Package source
+## Main package
 
     src/lc_soliton/
 
-## Public APIs
+### User-facing entry points
 
-    src/lc_soliton/static.py
-    src/lc_soliton/timedependent.py
-    src/lc_soliton/dualgrid.py
-    src/lc_soliton/runs.py
-    src/lc_soliton/validation/
+    static.py
+    timedependent.py
+    eigensoliton_runner.py
+    engine.py
+    request.py
 
-## Transitional validated code
+These provide the primary interfaces used by the GUI, notebooks, and scripts.
+
+## Core infrastructure
+
+    src/lc_soliton/core/
+
+Shared utilities including:
+
+- context construction
+- launch generation
+- storage helpers
+- backend selection
+- bias calculations
+
+## Validated computational kernels
+
+    src/lc_soliton/validated_core/
+
+Contains validated implementations used by the production runners.
+
+Examples include:
+
+- runner_core.py
+- launch_core.py
+- eigenmode_core.py
+- stability_core.py
+
+## Legacy validated code
 
     src/lc_soliton/legacy_validated/
 
-This code is preserved for reproducibility and is gradually being wrapped by
-stable public APIs.
+Preserved for reproducibility and comparison with trusted historical results.
+
+This code is not intended to be the primary development target.
+
+## Physics modules
+
+    src/lc_soliton/physics/
+
+Physics-specific helper routines.
+
+## Validation
+
+    src/lc_soliton/validation/
+    validation/
+
+Reference cases and validation assets.
 
 ## GUI
 
     app/app.py
 
+Primary Streamlit application.
+
 ## Examples
 
     examples/
+
+Small demonstration scripts and workflows.
 
 ## Tests
 
     tests/
 
-## Validation assets
-
-    validation/reference_cases/
+Automated tests and smoke tests.
 
 ## Documentation
 
     docs/
 
-## Generated outputs
+User, developer, and theory documentation.
+
+## Generated Outputs
 
     runs/
+    small_runs/
+
+Run directories, diagnostics, movies, metadata, and reproducibility artifacts.
 
 Generated outputs are ignored by git.
