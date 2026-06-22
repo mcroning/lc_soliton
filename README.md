@@ -21,7 +21,9 @@ New users should begin with:
 Documentation index:
 
     docs/index.md
+## Tutorials
 
+- [First Simulation Tutorial](docs/tutorial_first_simulation.md)
 ## Current Status
 
 The package is suitable for internal research use and active development.

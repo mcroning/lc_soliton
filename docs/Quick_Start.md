@@ -85,3 +85,11 @@ environment.json
 - docs/public_api.md
 - docs/eigensoliton_profiles.md
 - docs/theory.md
+
+## 7. Next Step
+
+Once the package is installed and validated, run the guided tutorial:
+
+- [First Simulation Tutorial](tutorial_first_simulation.md)
+
+This tutorial walks through a complete 1 mW LC soliton simulation using the Streamlit GUI.
