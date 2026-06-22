@@ -1,7 +1,7 @@
 # LC Soliton documentation
 
 ## Start here
-
+- [Quick Start](Quick_Start.md)
 - [Bootstrap / first-time setup](bootstrap.md)
 - [Current project status](current_status.md)
 - [Project map](project_map.md)
