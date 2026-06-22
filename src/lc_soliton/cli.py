@@ -5,6 +5,8 @@ Command-line interface for lc_soliton.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 
 from .engine import available_engine_modes
 
@@ -203,20 +205,27 @@ def main(argv=None) -> int:
         return 0
 
     if args.validate_reference:
+        import contextlib
+        import io
         from .reference_runner import run_reference_case
-    
-        summary = run_reference_case("strict_static_centroid_drift")
+
+        print("running reference validation: strict_static_centroid_drift ...", flush=True)
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            summary = run_reference_case("strict_static_centroid_drift")
+
         metrics = summary.get("new_summary", summary) if isinstance(summary, dict) else {}
-    
+
         print("reference validation passed: strict_static_centroid_drift")
-    
+
         if "max_residual_rms" in metrics:
             print("max_residual_rms:", metrics["max_residual_rms"])
         if "max_residual_max" in metrics:
             print("max_residual_max:", metrics["max_residual_max"])
         if "P_final" in metrics:
             print("P_final:", metrics["P_final"])
-    
+
         return 0
 
 
