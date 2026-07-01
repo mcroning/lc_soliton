@@ -1,1 +1,1 @@
-"""Diagnostics shared by LC soliton workflows."""
+"""Shared diagnostics for lc_soliton."""

@@ -1,66 +1,30 @@
 """
 lc_soliton.diagnostics.theta
 
-Shared theta diagnostics for the new LC soliton architecture.
+Shared theta diagnostics.
 
-This module contains measurements only.  It does not advance theta,
-solve nonlinear equations, propagate optics, or know about workflows.
-
-All routines are backend/dtype transparent: callers provide `xp`
-(NumPy or CuPy), and arrays determine precision.
+These functions centralize the measurements used by static, TD,
+eigensoliton, and stability workflows.  They intentionally do not solve
+anything.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from lc_soliton.theta_engine.residuals import (
-    cn_residual,
     pde_residual,
+    cn_residual,
     residual_stats,
 )
 
 
-@dataclass
-class ThetaDiagnostics:
-    """Compact summary of theta diagnostics for one state or step."""
-
-    pde_rms: float
-    pde_max: float
-    cn_rms: Optional[float] = None
-    cn_max: Optional[float] = None
-    update_rms: Optional[float] = None
-    update_max: Optional[float] = None
-
-    def as_dict(self) -> Dict[str, Optional[float]]:
-        return {
-            "pde_rms": self.pde_rms,
-            "pde_max": self.pde_max,
-            "cn_rms": self.cn_rms,
-            "cn_max": self.cn_max,
-            "update_rms": self.update_rms,
-            "update_max": self.update_max,
-        }
-
-
-def theta_update_stats(theta_new, theta_old, *, xp) -> Dict[str, float]:
+def theta_state_diagnostics(theta, intensity, ctx, *, xp) -> Dict[str, Any]:
     """
-    RMS and maximum update size on the interior x rows.
-    """
+    Diagnostics for a single theta state.
 
-    dtheta = theta_new - theta_old
-    dint = dtheta[1:-1, :]
-
-    return {
-        "update_rms": float(xp.sqrt(xp.mean(dint * dint))),
-        "update_max": float(xp.max(xp.abs(dint))),
-    }
-
-
-def theta_pde_stats(theta, intensity, ctx, *, xp) -> Dict[str, float]:
-    """
-    PDE residual statistics for a theta/intensity state.
+    Returns only PDE residual statistics.  CN and update quantities are
+    transition diagnostics, not state diagnostics.
     """
 
     R = pde_residual(
@@ -73,7 +37,6 @@ def theta_pde_stats(theta, intensity, ctx, *, xp) -> Dict[str, float]:
         mobility=float(getattr(ctx, "mobility", 1.0)),
         xp=xp,
     )
-
     st = residual_stats(R, xp=xp)
 
     return {
@@ -84,12 +47,18 @@ def theta_pde_stats(theta, intensity, ctx, *, xp) -> Dict[str, float]:
     }
 
 
-def theta_cn_stats(theta_new, theta_old, intensity, ctx, *, dt, xp) -> Dict[str, float]:
+def theta_transition_diagnostics(theta_new, theta_old, intensity, ctx, *, dt, xp) -> Dict[str, Any]:
     """
-    Crank-Nicolson equation residual statistics for one accepted theta step.
+    Diagnostics for one accepted theta transition.
     """
 
-    R = cn_residual(
+    dtheta = theta_new - theta_old
+    di = dtheta[1:-1, :]
+
+    update_rms = float(xp.sqrt(xp.mean(di * di)))
+    update_max = float(xp.max(xp.abs(di)))
+
+    Rcn = cn_residual(
         theta_new,
         theta_old,
         intensity,
@@ -101,93 +70,45 @@ def theta_cn_stats(theta_new, theta_old, intensity, ctx, *, dt, xp) -> Dict[str,
         mobility=float(getattr(ctx, "mobility", 1.0)),
         xp=xp,
     )
-
-    st = residual_stats(R, xp=xp)
+    st_cn = residual_stats(Rcn, xp=xp)
 
     return {
-        "cn_rms": st["rms_interior"],
-        "cn_max": st["max_interior"],
-        "cn_rms_full": st["rms_full"],
-        "cn_max_full": st["max_full"],
+        "update_rms": update_rms,
+        "update_max": update_max,
+        "cn_rms": st_cn["rms_interior"],
+        "cn_max": st_cn["max_interior"],
+        "cn_rms_full": st_cn["rms_full"],
+        "cn_max_full": st_cn["max_full"],
     }
-
-
-def summarize_theta_state(theta, intensity, ctx, *, xp) -> ThetaDiagnostics:
-    """
-    Diagnostics for a single theta/intensity state.
-    """
-
-    pde = theta_pde_stats(theta, intensity, ctx, xp=xp)
-
-    return ThetaDiagnostics(
-        pde_rms=pde["pde_rms"],
-        pde_max=pde["pde_max"],
-    )
-
-
-def summarize_theta_step(theta_new, theta_old, intensity, ctx, *, dt, xp) -> ThetaDiagnostics:
-    """
-    Diagnostics for one accepted theta step.
-
-    Includes PDE residual of theta_new, CN residual for the step, and
-    update norm theta_new-theta_old.
-    """
-
-    pde = theta_pde_stats(theta_new, intensity, ctx, xp=xp)
-    cn = theta_cn_stats(theta_new, theta_old, intensity, ctx, dt=dt, xp=xp)
-    upd = theta_update_stats(theta_new, theta_old, xp=xp)
-
-    return ThetaDiagnostics(
-        pde_rms=pde["pde_rms"],
-        pde_max=pde["pde_max"],
-        cn_rms=cn["cn_rms"],
-        cn_max=cn["cn_max"],
-        update_rms=upd["update_rms"],
-        update_max=upd["update_max"],
-    )
 
 
 def theta_history_row(
     *,
     step: int,
-    theta,
-    intensity,
-    ctx,
-    xp,
-    theta_old=None,
-    dt: Optional[float] = None,
+    state_diagnostics: Dict[str, Any],
+    transition_diagnostics: Optional[Dict[str, Any]] = None,
     cn_info: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Standard row for theta workflow histories.
-
-    If `theta_old` and `dt` are supplied, include update and CN residual
-    diagnostics.  If `cn_info` is supplied, include nonlinear-solver details.
+    Build a flat scalar-history row.
     """
 
-    pde = theta_pde_stats(theta, intensity, ctx, xp=xp)
+    transition_diagnostics = transition_diagnostics or {}
+    cn_info = cn_info or {}
 
-    row: Dict[str, Any] = {
+    return {
         "step": int(step),
-        "pde_rms": pde["pde_rms"],
-        "pde_max": pde["pde_max"],
+        "pde_rms": state_diagnostics.get("pde_rms"),
+        "pde_max": state_diagnostics.get("pde_max"),
+        "update_rms": transition_diagnostics.get("update_rms"),
+        "update_max": transition_diagnostics.get("update_max"),
+        "cn_rms": transition_diagnostics.get("cn_rms"),
+        "cn_max": transition_diagnostics.get("cn_max"),
+        "cn_rms_full": transition_diagnostics.get("cn_rms_full"),
+        "cn_max_full": transition_diagnostics.get("cn_max_full"),
+        "picard_iters": cn_info.get("niter"),
+        "picard_update_rms": cn_info.get("update_rms"),
+        "picard_update_max": cn_info.get("update_max"),
+        "picard_converged_update": cn_info.get("converged_update"),
+        "picard_converged_cn": cn_info.get("converged_cn"),
     }
-
-    if theta_old is not None:
-        row.update(theta_update_stats(theta, theta_old, xp=xp))
-
-    if theta_old is not None and dt is not None:
-        row.update(theta_cn_stats(theta, theta_old, intensity, ctx, dt=float(dt), xp=xp))
-    else:
-        row.update({"cn_rms": None, "cn_max": None})
-
-    if cn_info is not None:
-        row["picard_iters"] = cn_info.get("niter")
-        row["picard_update_rms"] = cn_info.get("update_rms")
-        row["picard_update_max"] = cn_info.get("update_max")
-        row["picard_converged_update"] = cn_info.get("converged_update")
-        row["picard_converged_cn"] = cn_info.get("converged_cn")
-    else:
-        row["picard_iters"] = None
-
-    return row

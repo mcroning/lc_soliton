@@ -1,29 +1,30 @@
 """
 lc_soliton.workflows.static
 
-Thin static workflow layer for theta relaxation.
+Static theta workflow.
 
-This module deliberately contains no numerical stencil or solver logic.
-It orchestrates the validated theta_engine public API.
+This module intentionally contains no PDE discretization, no CN algebra,
+and no Picard logic.  It orchestrates the validated theta engine and the
+shared diagnostics layer.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from lc_soliton.theta_engine.engine import relax_theta_steady
-from lc_soliton.theta_engine.residuals import pde_residual, residual_stats
+from lc_soliton.diagnostics.theta import theta_state_diagnostics
 
 
 @dataclass
 class StaticThetaResult:
-    """Result container for a frozen-I static theta relaxation."""
+    """Result returned by run_static_theta."""
 
     theta: Any
-    info: dict
-    initial_pde: dict
-    final_pde: dict
+    info: Dict[str, Any]
+    diagnostics_initial: Dict[str, Any]
+    diagnostics_final: Dict[str, Any]
 
 
 def run_static_theta(
@@ -39,46 +40,34 @@ def run_static_theta(
     xp,
 ) -> StaticThetaResult:
     """
-    Relax theta toward a steady solution for fixed intensity.
+    Relax theta toward a steady solution for a fixed intensity.
 
     Parameters
     ----------
-    theta_seed : array
-        Initial theta field.
-    intensity : array
-        Fixed optical intensity on the theta grid.
-    ctx : object
+    theta_seed, intensity
+        Initial theta and fixed optical intensity.
+    ctx
         Context-like object with du, dv, b, bi, mobility, theta_bc, etc.
-    dtau, max_steps, residual_tol_rms, residual_tol_max : optional
-        Overrides for pseudo-time relaxation settings.
-    dtype : optional
-        If supplied, theta/intensity are cast to this dtype before solving.
-    xp : module
-        NumPy or CuPy module.
+    dtau, max_steps, residual_tol_rms, residual_tol_max
+        Optional overrides for the pseudo-time relaxer.
+    dtype, xp
+        Precision/backend policy.  The caller chooses these explicitly.
 
     Returns
     -------
     StaticThetaResult
+        The relaxed theta, engine info, and standardized diagnostics.
     """
 
-    if dtype is not None:
-        theta0 = theta_seed.astype(dtype, copy=False)
-        I = intensity.astype(dtype, copy=False)
-    else:
-        theta0 = theta_seed
-        I = intensity
+    theta0 = theta_seed.astype(dtype, copy=False) if dtype is not None else theta_seed
+    I = intensity.astype(dtype, copy=False) if dtype is not None else intensity
 
-    R0 = pde_residual(
+    diag0 = theta_state_diagnostics(
         theta0,
         I,
-        du=float(ctx.du),
-        dv=float(ctx.dv),
-        b=float(ctx.b),
-        bi=float(ctx.bi),
-        mobility=float(getattr(ctx, "mobility", 1.0)),
+        ctx,
         xp=xp,
     )
-    initial_pde = residual_stats(R0, xp=xp)
 
     theta, info = relax_theta_steady(
         theta0,
@@ -92,21 +81,16 @@ def run_static_theta(
         xp=xp,
     )
 
-    R1 = pde_residual(
+    diag1 = theta_state_diagnostics(
         theta,
         I,
-        du=float(ctx.du),
-        dv=float(ctx.dv),
-        b=float(ctx.b),
-        bi=float(ctx.bi),
-        mobility=float(getattr(ctx, "mobility", 1.0)),
+        ctx,
         xp=xp,
     )
-    final_pde = residual_stats(R1, xp=xp)
 
     return StaticThetaResult(
         theta=theta,
         info=info,
-        initial_pde=initial_pde,
-        final_pde=final_pde,
+        diagnostics_initial=diag0,
+        diagnostics_final=diag1,
     )
