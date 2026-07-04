@@ -32,7 +32,10 @@ from ..algorithms.theta_cn import prepare_cn_operator
 from ..algorithms.theta_picard import cn_trapezoid_picard_step
 from ..algorithms.thomas import solve_const_offdiag_batched
 from ..algorithms.static_relax import StaticRelaxControls, run_static_relax
-from .timedependent import moment_metrics
+from ..products.diagnostics import (
+    intensity_metrics,
+    theta_update_metrics,
+)
 
 
 def _select_tridiag_solver(request: StaticRequest):
@@ -42,15 +45,6 @@ def _select_tridiag_solver(request: StaticRequest):
         return solve_const_offdiag_batched_fast
     return solve_const_offdiag_batched
 
-
-def _theta_update_metrics(theta, theta_prev, grid) -> dict[str, float]:
-    xp = grid.xp
-    dtheta = theta - theta_prev
-    rms = xp.sqrt(xp.mean(dtheta * dtheta))
-    return {
-        "dtheta_rms": float(asnumpy(rms)),
-        "dtheta_max": float(asnumpy(xp.max(xp.abs(dtheta)))),
-    }
 
 
 def run_static(request: StaticRequest) -> RunSummary:
@@ -152,13 +146,13 @@ def run_static(request: StaticRequest) -> RunSummary:
         return Awork, I
 
     def convergence(theta, theta_prev, info):
-        m = _theta_update_metrics(theta, theta_prev, grid)
+        m = theta_update_metrics(theta, theta_prev)
         info.update(m)
         return (m["dtheta_rms"] < request.tol_rms) and (m["dtheta_max"] < request.tol_max)
 
     def observer(payload):
         info = dict(payload["info"])
-        mm = moment_metrics(payload["intensity"], grid)
+        mm = intensity_metrics(payload["intensity"], grid)
         mm.update(info)
         mm["theta_max"] = float(asnumpy(xp.max(payload["theta"])))
         samples.append(mm)
@@ -178,7 +172,7 @@ def run_static(request: StaticRequest) -> RunSummary:
     synchronize(xp)
     elapsed = _time.perf_counter() - t0
 
-    metrics = moment_metrics(result.intensity, grid)
+    metrics = intensity_metrics(result.intensity, grid)
     metrics.update({
         "backend": backend.name,
         "precision": request.backend.precision,

@@ -21,28 +21,7 @@ from ..algorithms.theta_cn import prepare_cn_operator
 from ..algorithms.theta_picard import cn_trapezoid_picard_step
 from ..algorithms.thomas import solve_const_offdiag_batched
 from ..algorithms.td_zmarch import TDZMarchControls, run_td_zmarch
-
-
-def moment_metrics(I: Any, grid: Any) -> dict[str, float]:
-    """Return power, peak intensity, RMS widths, and centroid."""
-    xp = grid.xp
-    raw = xp.sum(I) + xp.asarray(1e-300, dtype=I.dtype)
-    P = raw * float(grid.dx_um) * float(grid.dy_um)
-    x = grid.x_um
-    y = grid.y_um
-    xc = xp.sum(I * x[:, None]) / raw
-    yc = xp.sum(I * y[None, :]) / raw
-    sx = xp.sqrt(xp.sum(I * (x[:, None] - xc) ** 2) / raw)
-    sy = xp.sqrt(xp.sum(I * (y[None, :] - yc) ** 2) / raw)
-    return {
-        "power": float(asnumpy(P)),
-        "Imax": float(asnumpy(xp.max(I))),
-        "sx_um": float(asnumpy(sx)),
-        "sy_um": float(asnumpy(sy)),
-        "xc_um": float(asnumpy(xc)),
-        "yc_um": float(asnumpy(yc)),
-    }
-
+from ..products.diagnostics import intensity_metrics
 
 def _select_tridiag_solver(request: TDRequest):
     if request.tridiag == "fast":
@@ -140,7 +119,7 @@ def run_timedependent(request: TDRequest) -> RunSummary:
 
     def observer(payload):
         if payload["jt"] == request.time.Nt and payload["k"] % sample_every == 0:
-            mm = moment_metrics(payload["I_mid"], grid)
+            mm = intensity_metrics(payload["I_mid"], grid)
             mm.update({
                 "jt": int(payload["jt"]),
                 "k": int(payload["k"]),
@@ -163,7 +142,7 @@ def run_timedependent(request: TDRequest) -> RunSummary:
     elapsed = _time.perf_counter() - t0
 
     final_I = total_intensity(result.A_last, coherent=(launch.coherence == "coherent"), xp=xp)
-    metrics = moment_metrics(final_I, grid)
+    metrics = intensity_metrics(final_I, grid)
     metrics.update({
         "backend": backend.name,
         "precision": request.backend.precision,
@@ -181,4 +160,4 @@ def run_timedependent(request: TDRequest) -> RunSummary:
     return RunSummary(kind="TDRunSummary", metrics=metrics, samples=samples)
 
 
-__all__ = ["moment_metrics", "run_timedependent"]
+__all__ = ["intensity_metrics", "run_timedependent"]
