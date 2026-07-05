@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from .request import TDRequest, StaticRequest, RunSummary
+from .request import TDRequest, StaticRequest
+from .result import BaseResult
 from .workflows.timedependent import run_timedependent
 from .workflows.static import run_static
 
-def run(request):
+
+def run(request: TDRequest | StaticRequest) -> BaseResult:
+    """Run a clean LC request."""
     if isinstance(request, TDRequest):
         return run_timedependent(request)
     if isinstance(request, StaticRequest):

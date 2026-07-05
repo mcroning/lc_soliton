@@ -10,7 +10,8 @@ import math
 import time as _time
 from typing import Any
 
-from ..request import TDRequest, RunSummary
+from ..request import TDRequest
+from ..result import TDResult
 from ..numerics.backend import get_backend, asnumpy, synchronize
 from ..numerics.grid import make_grid
 from ..physics.liquid_crystal import resolved_b, neff_from_theta
@@ -157,7 +158,14 @@ def run_timedependent(request: TDRequest) -> RunSummary:
         "elapsed_s": float(elapsed),
         "theta_max": float(asnumpy(xp.max(result.theta))),
     })
-    return RunSummary(kind="TDRunSummary", metrics=metrics, samples=samples)
+    return TDResult(
+        kind="TDResult",
+        metrics=metrics,
+        samples=samples,
+        theta=result.theta,
+        A_last=result.A_last,
+        final_intensity=final_I,
+    )
 
 
 __all__ = ["intensity_metrics", "run_timedependent"]
