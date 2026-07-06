@@ -12,6 +12,7 @@ from ..result import StaticResult
 from ..numerics.backend import get_backend, asnumpy, synchronize
 from ..numerics.grid import make_grid
 from ..physics.liquid_crystal import resolved_b, neff_from_theta
+from ..physics.coupling import resolved_bi
 from ..physics.bias import build_bias, stack_theta
 from ..physics.launch import build_launch
 from ..algorithms.splitstep import linear_kernel, total_intensity
@@ -90,6 +91,37 @@ def _stack_residual_metrics(theta_stack, intensity_stack, *, b, bi, gamma_z, inv
         count += n
     return {"residual_rms": math.sqrt(total_sq / max(1, count)), "residual_max": max_abs}
 
+def _beta_from_overlap(A0, A1, *, grid, wavelength_um: float, n_ref: float, d_um: float):
+    """Estimate dimensionless beta from end-to-end complex field overlap.
+
+    Uses dimensionless propagation length
+
+        zeta = 2 z / (k_ref d^2)
+
+    with k_ref = 2 pi n_ref / wavelength.
+
+    This is the natural propagation β estimate for a nearly stationary mode.
+    """
+    xp = grid.xp
+    dxdy = float(grid.dx_um) * float(grid.dy_um)
+
+    ov = xp.sum(xp.conj(A0) * A1) * dxdy
+    p0 = xp.sum(xp.abs(A0) ** 2) * dxdy
+    p1 = xp.sum(xp.abs(A1) ** 2) * dxdy
+
+    ovn = ov / xp.sqrt(p0 * p1 + 1e-300)
+    phase = xp.angle(ovn)
+
+    z_um = float(grid.Nz) * float(grid.dz_um)
+    k_ref = 2.0 * math.pi * float(n_ref) / float(wavelength_um)
+    zeta = 2.0 * z_um / (k_ref * float(d_um) ** 2)
+
+    return {
+        "beta": float(asnumpy(phase / zeta)),
+        "beta_phase_rad": float(asnumpy(phase)),
+        "beta_overlap_abs": float(asnumpy(xp.abs(ovn))),
+        "zeta": float(zeta),
+    }
 
 def run_static_zstack(request: StaticRequest, *, initial_theta: Any | None = None, controls: StaticZStackControls | None = None) -> StaticResult:
     request.validate()
@@ -103,7 +135,7 @@ def run_static_zstack(request: StaticRequest, *, initial_theta: Any | None = Non
     tridiag_solver = _select_tridiag_solver(request)
 
     b = resolved_b(request.lc)
-    bi = 214.28571428571428
+    bi = resolved_bi(request.lc, request.beams)
     gamma_z = float(getattr(request.lc, "theta_z_gamma", 0.0))
     inv_dz2 = 1.0 / (float(grid.dz_um) * float(grid.dz_um))
 
@@ -202,6 +234,15 @@ def run_static_zstack(request: StaticRequest, *, initial_theta: Any | None = Non
     elapsed = _time.perf_counter() - t0
 
     metrics = intensity_metrics(final_I, grid)
+
+    metrics.update(_beta_from_overlap(
+        launch.A0,
+        A_last,
+        grid=grid,
+        wavelength_um=wavelength_um,
+        n_ref=n_ref,
+        d_um=request.lc.cell.thickness_um,
+    ))
     metrics.update(_stack_residual_metrics(theta_stack, I_stack, b=b, bi=bi, gamma_z=gamma_z, inv_dz2=inv_dz2, grid=grid))
     if history:
         for key in ("dtheta_rms", "dtheta_max", "update_converged", "residual_converged", "slice_converged_count", "slice_residual_rms_max", "slice_residual_max_max", "slice_niter_max", "slice_selfcons_passes_max"):

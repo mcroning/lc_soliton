@@ -1,29 +1,65 @@
-"""Static/self-consistent LC workflow.
+"""Static optical propagation workflow.
 
-v006 adds ``static_inner_steps``: multiple theta pseudo-time CN/Picard updates
-are performed for each optical outer step. This makes the static workflow a
-more faithful static relaxer instead of a single-step fixed-point iteration.
+"Static" here means optical propagation through an LC director field that is
+assumed to relax instantaneously to the steady time-independent PDE.
+
+For each outer self-consistency pass:
+
+    launch A
+    for each z slice:
+        compute midpoint intensity
+        solve steady theta PDE for that slice
+        propagate A through that theta slice
+
+This is the workflow for fixed/instantaneous LC response beam propagation:
+collisions, angled beams, spiraling beams, and other prescribed launches.
+
+For the lower-level fixed-intensity director solve, use
+``workflows.theta_static.run_theta_static``.
+For stationary nonlinear eigenmodes, use ``workflows.soliton.run_soliton``.
+For finite-time LC dynamics, use ``workflows.timedependent``.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
 import math
 import time as _time
-from typing import Any
 
 from ..request import StaticRequest
 from ..result import StaticResult
 from ..numerics.backend import get_backend, asnumpy, synchronize
 from ..numerics.grid import make_grid
-from ..physics.liquid_crystal import resolved_b, neff_from_theta
-from ..physics.bias import build_bias
+from ..physics.bias import build_bias, stack_theta
 from ..physics.launch import build_launch
-from ..algorithms.splitstep import advance_slice, linear_kernel, total_intensity
+from ..physics.liquid_crystal import resolved_b, neff_from_theta
+from ..physics.coupling import resolved_bi
+from ..algorithms.splitstep import (
+    advance_slice_with_midintensity,
+    linear_kernel,
+    total_intensity,
+)
 from ..algorithms.theta_cn import prepare_cn_operator
 from ..algorithms.theta_picard import cn_trapezoid_picard_step
 from ..algorithms.thomas import solve_const_offdiag_batched
-from ..algorithms.static_relax import StaticRelaxControls, run_static_relax
-from ..products.diagnostics import intensity_metrics, theta_update_metrics, residual_theta_static
+from ..products.diagnostics import intensity_metrics, residual_theta_static
+
+
+@dataclass(frozen=True)
+class StaticPropagationControls:
+    """Controls for instantaneous-equilibrium static propagation."""
+
+    theta_steps_per_slice: int = 25
+    theta_picard_iters: int = 4
+    theta_picard_tol: float = 1e-6
+    theta_dt: float = 7.5e-4
+
+    observer_stride: int = 1
+
+    dz_opt_max_phi: float = 0.30
+    dn_max_est: float = 0.02
+    max_substeps: int = 16
 
 
 def _select_tridiag_solver(request: StaticRequest):
@@ -33,22 +69,71 @@ def _select_tridiag_solver(request: StaticRequest):
     return solve_const_offdiag_batched
 
 
-def _prepare_initial_theta(initial_theta: Any, bias_theta, grid, theta_bc: float):
-    if initial_theta is None:
-        return bias_theta
+def _prepare_theta_stack(initial_theta: Any, bias, grid, theta_bc: float):
     xp = grid.xp
-    theta = xp.asarray(initial_theta, dtype=grid.real_dtype).copy()
-    if theta.shape != bias_theta.shape:
-        raise ValueError(f"initial_theta shape {theta.shape} does not match {bias_theta.shape}")
-    theta[0, :] = theta_bc
-    theta[-1, :] = theta_bc
-    return theta
+    if initial_theta is None:
+        theta_stack = bias.theta_stack.copy()
+    else:
+        theta = xp.asarray(initial_theta, dtype=grid.real_dtype)
+        if theta.shape == bias.theta_2d.shape:
+            theta_stack = stack_theta(theta, grid)
+        elif theta.shape == bias.theta_stack.shape:
+            theta_stack = theta.copy()
+        else:
+            raise ValueError(
+                f"initial_theta shape {theta.shape} must be "
+                f"{bias.theta_2d.shape} or {bias.theta_stack.shape}"
+            )
+    theta_stack[:, 0, :] = theta_bc
+    theta_stack[:, -1, :] = theta_bc
+    return theta_stack
 
 
-def run_static(request: StaticRequest, *, initial_theta: Any | None = None) -> StaticResult:
-    """Run a static/self-consistent LC request."""
+def _stack_update_metrics(theta_stack, theta_prev, xp) -> dict[str, float]:
+    d = theta_stack - theta_prev
+    return {
+        "dtheta_rms": float(asnumpy(xp.sqrt(xp.mean(d * d)))),
+        "dtheta_max": float(asnumpy(xp.max(xp.abs(d)))),
+    }
+
+
+def _stack_residual_metrics(theta_stack, intensity_stack, *, b, bi, grid, theta_bc) -> dict[str, float]:
+    total_sq = 0.0
+    max_abs = 0.0
+    count = 0
+
+    for k in range(int(grid.Nz)):
+        r = residual_theta_static(
+            theta_stack[k],
+            intensity_stack[k],
+            b=b,
+            bi=bi,
+            dx=grid.du,
+            dy=grid.dv,
+            theta_bc=theta_bc,
+            xp=grid.xp,
+        )
+        n = (int(grid.Nx) - 2) * int(grid.Ny)
+        total_sq += float(r["residual_rms"]) ** 2 * n
+        max_abs = max(max_abs, float(r["residual_max"]))
+        count += n
+
+    return {
+        "residual_rms": math.sqrt(total_sq / max(1, count)),
+        "residual_max": max_abs,
+    }
+
+
+def run_static(
+    request: StaticRequest,
+    *,
+    initial_theta: Any | None = None,
+    controls: StaticPropagationControls | None = None,
+) -> StaticResult:
+    """Run static instantaneous-equilibrium optical propagation."""
 
     request.validate()
+    controls = StaticPropagationControls() if controls is None else controls
 
     backend = get_backend(request.backend)
     xp = backend.xp
@@ -59,26 +144,28 @@ def run_static(request: StaticRequest, *, initial_theta: Any | None = None) -> S
     tridiag_solver = _select_tridiag_solver(request)
 
     b = resolved_b(request.lc)
-    bi = 214.28571428571428
+    bi = resolved_bi(request.lc, request.beams)
+    theta_bc = float(request.lc.cell.theta_bc)
 
-    theta0 = _prepare_initial_theta(initial_theta, bias.theta_2d, grid, request.lc.cell.theta_bc)
+    theta_stack = _prepare_theta_stack(initial_theta, bias, grid, theta_bc)
 
     n_ref = float(asnumpy(neff_from_theta(
-        theta0,
+        bias.theta_2d,
         ne=request.lc.material.ne,
         no=request.lc.material.no,
         xp=xp,
     )).mean())
-
     wavelength_um = float(asnumpy(launch.wavelengths_um[0]))
 
-    dn_max_est = 0.02
-    dz_opt_max_phi = 0.30
-    max_substeps = 16
-    phi_est = (2.0 * math.pi / wavelength_um) * float(grid.dz_um) * dn_max_est
-    Nsub = max(1, min(max_substeps, int(math.ceil(phi_est / dz_opt_max_phi))))
-    dz_sub = float(grid.dz_um) / Nsub
-
+    phi_est = (2.0 * math.pi / wavelength_um) * float(grid.dz_um) * float(controls.dn_max_est)
+    Nsub = max(
+        1,
+        min(
+            int(controls.max_substeps),
+            int(math.ceil(phi_est / float(controls.dz_opt_max_phi))),
+        ),
+    )
+    dz_sub = float(grid.dz_um) / int(Nsub)
     h_sub = linear_kernel(
         grid.fxy2_um,
         dz=dz_sub,
@@ -88,7 +175,7 @@ def run_static(request: StaticRequest, *, initial_theta: Any | None = None) -> S
     )
 
     s_cn, off_cn, diag_cn, _ = prepare_cn_operator(
-        dt=7.5e-4,
+        dt=float(controls.theta_dt),
         mobility=request.lc.mobility,
         dx=grid.du,
         dy=grid.dv,
@@ -97,160 +184,188 @@ def run_static(request: StaticRequest, *, initial_theta: Any | None = None) -> S
         dtype=backend.real_dtype,
     )
 
-    A0 = launch.A0
-    intensity0 = total_intensity(A0, coherent=(launch.coherence == "coherent"), xp=xp)
-    latest_intensity = {"value": intensity0}
+    def solve_theta_slice(theta_seed, intensity):
+        out = theta_seed
+        for _ in range(int(controls.theta_steps_per_slice)):
+            out = cn_trapezoid_picard_step(
+                out,
+                intensity,
+                intensity,
+                b=b,
+                bi=bi,
+                dt=float(controls.theta_dt),
+                mobility=request.lc.mobility,
+                dx=grid.du,
+                dy=grid.dv,
+                s=s_cn,
+                off=off_cn,
+                diag=diag_cn,
+                max_iter=int(controls.theta_picard_iters),
+                tol_update=float(controls.theta_picard_tol),
+                clamp=bias.theta_clamp,
+                tridiag_solver=tridiag_solver,
+                xp=xp,
+            )
+            out[0, :] = theta_bc
+            out[-1, :] = theta_bc
+        return out
 
+    I_stack = xp.zeros_like(theta_stack)
+    history: list[dict] = []
     samples: list[dict] = []
+    converged = False
 
-    def one_theta_step(theta, intensity):
-        out = cn_trapezoid_picard_step(
-            theta,
-            intensity,
-            intensity,
-            b=b,
-            bi=bi,
-            dt=7.5e-4,
-            mobility=request.lc.mobility,
-            dx=grid.du,
-            dy=grid.dv,
-            s=s_cn,
-            off=off_cn,
-            diag=diag_cn,
-            max_iter=4,
-            tol_update=1e-6,
-            clamp=bias.theta_clamp,
-            tridiag_solver=tridiag_solver,
-            xp=xp,
-        )
-        out[0, :] = request.lc.cell.theta_bc
-        out[-1, :] = request.lc.cell.theta_bc
-        return out
+    A_last = launch.A0.copy()
+    final_I = total_intensity(A_last, coherent=(launch.coherence == "coherent"), xp=xp)
 
-    def theta_relax(theta, intensity, outer):
-        out = theta
-        for _ in range(int(request.static_inner_steps)):
-            out = one_theta_step(out, intensity)
-        return out
+    synchronize(xp)
+    t0 = _time.perf_counter()
 
-    def optics_update(A, theta, outer):
-        Awork = A0.copy()
-        for _k in range(grid.Nz):
-            advance_slice(
-                Awork,
-                theta,
+    for outer in range(int(request.max_outer)):
+        theta_old = theta_stack.copy()
+        theta_new = theta_stack.copy()
+
+        A = launch.A0.copy()
+
+        for k in range(int(grid.Nz)):
+            # First propagate a candidate slice with the previous theta to get
+            # a midpoint intensity. Then solve the instantaneous steady theta
+            # for that midpoint intensity and re-propagate the same incoming
+            # field through the updated theta.
+            A_in = A.copy()
+
+            A_tmp, _I0, _I1, I_mid = advance_slice_with_midintensity(
+                A_in.copy(),
+                theta_old[k],
                 kernel=h_sub,
                 dz=float(grid.dz_um),
                 wavelength=wavelength_um,
                 n_ref=n_ref,
                 ne=request.lc.material.ne,
                 no=request.lc.material.no,
-                Nsub=Nsub,
+                Nsub=int(Nsub),
+                coherent=(launch.coherence == "coherent"),
+                theta_weights=launch.theta_weights,
                 xp=xp,
             )
-        I = total_intensity(Awork, coherent=(launch.coherence == "coherent"), xp=xp)
-        latest_intensity["value"] = I
-        return Awork, I
 
-    def convergence(theta, theta_prev, info):
-        intensity = latest_intensity["value"]
-        update = theta_update_metrics(theta, theta_prev)
-        residual = residual_theta_static(
-            theta,
-            intensity,
+            th = solve_theta_slice(theta_old[k], I_mid)
+            theta_new[k] = th
+            I_stack[k] = I_mid.astype(grid.real_dtype, copy=False)
+
+            A, _I0b, _I1b, I_mid_b = advance_slice_with_midintensity(
+                A_in,
+                th,
+                kernel=h_sub,
+                dz=float(grid.dz_um),
+                wavelength=wavelength_um,
+                n_ref=n_ref,
+                ne=request.lc.material.ne,
+                no=request.lc.material.no,
+                Nsub=int(Nsub),
+                coherent=(launch.coherence == "coherent"),
+                theta_weights=launch.theta_weights,
+                xp=xp,
+            )
+            I_stack[k] = I_mid_b.astype(grid.real_dtype, copy=False)
+
+        theta_stack = theta_new
+        theta_stack[:, 0, :] = theta_bc
+        theta_stack[:, -1, :] = theta_bc
+
+        A_last = A
+        final_I = total_intensity(A_last, coherent=(launch.coherence == "coherent"), xp=xp)
+
+        update = _stack_update_metrics(theta_stack, theta_old, xp)
+        residual = _stack_residual_metrics(
+            theta_stack,
+            I_stack,
             b=b,
             bi=bi,
-            dx=grid.du,
-            dy=grid.dv,
-            theta_bc=request.lc.cell.theta_bc,
-            xp=xp,
+            grid=grid,
+            theta_bc=theta_bc,
         )
-        info.update(update)
-        info.update(residual)
-        info["update_converged"] = bool(
-            update["dtheta_rms"] < request.tol_rms
-            and update["dtheta_max"] < request.tol_max
-        )
-        info["residual_converged"] = bool(
-            residual["residual_rms"] < request.tol_residual_rms
-            and residual["residual_max"] < request.tol_residual_max
-        )
-        return bool(info["update_converged"] and info["residual_converged"])
 
-    def observer(payload):
-        info = dict(payload["info"])
-        theta = payload["theta"]
-        intensity = payload["intensity"]
-        mm = intensity_metrics(intensity, grid)
-        mm.update(info)
-        mm["theta_max"] = float(asnumpy(xp.max(theta)))
-        samples.append(mm)
+        info = {
+            "outer": int(outer + 1),
+            **update,
+            **residual,
+            "update_converged": bool(
+                update["dtheta_rms"] < request.tol_rms
+                and update["dtheta_max"] < request.tol_max
+            ),
+            "residual_converged": bool(
+                residual["residual_rms"] < request.tol_residual_rms
+                and residual["residual_max"] < request.tol_residual_max
+            ),
+            "theta_max": float(asnumpy(xp.max(theta_stack))),
+        }
+        info.update(intensity_metrics(final_I, grid))
+        history.append(info)
 
-    synchronize(xp)
-    t0 = _time.perf_counter()
-    result = run_static_relax(
-        theta0,
-        A0,
-        intensity0,
-        theta_relax=theta_relax,
-        optics_update=optics_update,
-        controls=StaticRelaxControls(max_outer=request.max_outer, observer_stride=1),
-        convergence=convergence,
-        observer=observer,
-    )
+        if outer % max(1, int(controls.observer_stride)) == 0:
+            samples.append(dict(info))
+
+        if info["update_converged"] and info["residual_converged"]:
+            converged = True
+            break
+
     synchronize(xp)
     elapsed = _time.perf_counter() - t0
 
-    metrics = intensity_metrics(result.intensity, grid)
-    metrics.update(residual_theta_static(
-        result.theta,
-        result.intensity,
+    metrics = intensity_metrics(final_I, grid)
+    metrics.update(_stack_residual_metrics(
+        theta_stack,
+        I_stack,
         b=b,
         bi=bi,
-        dx=grid.du,
-        dy=grid.dv,
-        theta_bc=request.lc.cell.theta_bc,
-        xp=xp,
+        grid=grid,
+        theta_bc=theta_bc,
     ))
-    metrics.update({
-        "backend": backend.name,
-        "precision": request.backend.precision,
-        "tridiag": request.tridiag,
-        "Nx": grid.Nx,
-        "Ny": grid.Ny,
-        "Nz": grid.Nz,
-        "outer_steps": int(result.outer_steps),
-        "static_inner_steps": int(request.static_inner_steps),
-        "converged": bool(result.converged),
-        "used_initial_theta": bool(initial_theta is not None),
-        "b": float(b),
-        "bi": float(bi),
-        "n_ref": float(n_ref),
-        "Nsub": int(Nsub),
-        "elapsed_s": float(elapsed),
-        "theta_max": float(asnumpy(xp.max(result.theta))),
-    })
 
-    if result.history:
-        last = result.history[-1]
+    if history:
         for key in (
             "dtheta_rms",
             "dtheta_max",
             "update_converged",
             "residual_converged",
         ):
-            if key in last:
-                metrics[key] = last[key]
+            metrics[key] = history[-1][key]
+
+    metrics.update({
+        "backend": backend.name,
+        "precision": request.backend.precision,
+        "tridiag": request.tridiag,
+        "Nx": int(grid.Nx),
+        "Ny": int(grid.Ny),
+        "Nz": int(grid.Nz),
+        "outer_steps": len(history),
+        "theta_steps_per_slice": int(controls.theta_steps_per_slice),
+        "theta_picard_iters": int(controls.theta_picard_iters),
+        "theta_dt": float(controls.theta_dt),
+        "converged": bool(converged),
+        "used_initial_theta": bool(initial_theta is not None),
+        "b": float(b),
+        "bi": float(bi),
+        "n_ref": float(n_ref),
+        "Nsub": int(Nsub),
+        "elapsed_s": float(elapsed),
+        "theta_max": float(asnumpy(xp.max(theta_stack))),
+        "theta_shape": tuple(int(x) for x in theta_stack.shape),
+    })
 
     return StaticResult(
-        kind="StaticResult",
+        kind="StaticPropagationResult",
         metrics=metrics,
         samples=samples,
-        theta=result.theta,
-        intensity=result.intensity,
-        history=result.history,
-        converged=result.converged,
+        theta=theta_stack,
+        intensity=I_stack,
+        history=history,
+        converged=bool(converged),
     )
 
 
-__all__ = ["run_static"]
+__all__ = [
+    "StaticPropagationControls",
+    "run_static",
+]

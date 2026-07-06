@@ -5,16 +5,16 @@ It is plumbing, not a numerical algorithm.
 """
 
 from __future__ import annotations
-
+from dataclasses import dataclass
 import math
 import time as _time
-from typing import Any
 
 from ..request import TDRequest
 from ..result import TDResult
 from ..numerics.backend import get_backend, asnumpy, synchronize
 from ..numerics.grid import make_grid
 from ..physics.liquid_crystal import resolved_b, neff_from_theta
+from ..physics.coupling import resolved_bi
 from ..physics.bias import build_bias
 from ..physics.launch import build_launch
 from ..algorithms.splitstep import advance_slice_with_midintensity, hop_linear_inplace, linear_kernel, total_intensity
@@ -24,6 +24,17 @@ from ..algorithms.thomas import solve_const_offdiag_batched
 from ..algorithms.td_zmarch import TDZMarchControls, run_td_zmarch
 from ..products.diagnostics import intensity_metrics
 
+@dataclass(frozen=True)
+class TDControls:
+    theta_picard_iters: int = 4
+    theta_picard_tol: float = 1e-6
+
+    dz_opt_max_phi: float = 0.30
+    dn_max_est: float = 0.02
+    max_substeps: int = 16
+
+    observer_stride_z: int | None = None
+
 def _select_tridiag_solver(request: TDRequest):
     if request.tridiag == "fast":
         from ..algorithms.thomas_fast import solve_const_offdiag_batched_fast
@@ -31,10 +42,16 @@ def _select_tridiag_solver(request: TDRequest):
     return solve_const_offdiag_batched
 
 
-def run_timedependent(request: TDRequest) -> RunSummary:
+
+def run_timedependent(
+    request: TDRequest,
+    *,
+    controls: TDControls | None = None,
+
+) -> TDResult:
     """Run a time-dependent LC propagation request."""
     request.validate()
-
+    controls = TDControls() if controls is None else controls
     backend = get_backend(request.backend)
     xp = backend.xp
     grid = make_grid(request.grid, xp=xp, real_dtype=backend.real_dtype)
@@ -43,6 +60,7 @@ def run_timedependent(request: TDRequest) -> RunSummary:
     tridiag_solver = _select_tridiag_solver(request)
 
     b = resolved_b(request.lc)
+    bi = resolved_bi(request.lc, request.beams)
     n_ref = float(asnumpy(neff_from_theta(
         bias.theta_2d,
         ne=request.lc.material.ne,
@@ -51,9 +69,9 @@ def run_timedependent(request: TDRequest) -> RunSummary:
     )).mean())
 
     wavelength_um = float(asnumpy(launch.wavelengths_um[0]))
-    dn_max_est = 0.02
-    dz_opt_max_phi = 0.30
-    max_substeps = 16
+    dn_max_est = controls.dn_max_est
+    dz_opt_max_phi = controls.dz_opt_max_phi
+    max_substeps = controls.max_substeps
     phi_est = (2.0 * math.pi / wavelength_um) * float(grid.dz_um) * dn_max_est
     Nsub = max(1, min(max_substeps, int(math.ceil(phi_est / dz_opt_max_phi))))
     dz_sub = float(grid.dz_um) / Nsub
@@ -92,12 +110,13 @@ def run_timedependent(request: TDRequest) -> RunSummary:
         return A, I_mid
 
     def theta_step(theta_k, I_mid, theta_prev, theta_next, k):
+
         out = cn_trapezoid_picard_step(
             theta_k,
             I_mid,
             I_mid,
             b=b,
-            bi=214.28571428571428,
+            bi=bi,
             dt=request.time.dt,
             mobility=request.lc.mobility,
             dx=grid.du,
@@ -105,8 +124,8 @@ def run_timedependent(request: TDRequest) -> RunSummary:
             s=s_cn,
             off=off_cn,
             diag=diag_cn,
-            max_iter=4,
-            tol_update=1e-6,
+            max_iter=controls.theta_picard_iters,
+            tol_update=controls.theta_picard_tol,
             clamp=bias.theta_clamp,
             tridiag_solver=tridiag_solver,
             xp=xp,
@@ -116,7 +135,11 @@ def run_timedependent(request: TDRequest) -> RunSummary:
         return out
 
     samples: list[dict] = []
-    sample_every = max(1, grid.Nz // 4)
+    sample_every = (
+        max(1, grid.Nz // 4)
+        if controls.observer_stride_z is None
+        else int(controls.observer_stride_z)
+    )
 
     def observer(payload):
         if payload["jt"] == request.time.Nt and payload["k"] % sample_every == 0:
@@ -153,6 +176,7 @@ def run_timedependent(request: TDRequest) -> RunSummary:
         "Nz": grid.Nz,
         "Nt": request.time.Nt,
         "b": float(b),
+        "bi": float(bi),
         "n_ref": float(n_ref),
         "Nsub": int(Nsub),
         "elapsed_s": float(elapsed),
@@ -168,4 +192,4 @@ def run_timedependent(request: TDRequest) -> RunSummary:
     )
 
 
-__all__ = ["intensity_metrics", "run_timedependent"]
+__all__ = ["TDControls", "run_timedependent"]
